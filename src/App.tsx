@@ -4,7 +4,7 @@ import { DashbroadListing } from "./screens/DashbroadListing/DashbroadListing";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "./components/ui/card";
-import { initDB, getAllItems } from "./lib/db";
+import { initDB, getAllItems, checkApiConnectivity } from "./lib/db";
 import { DatabaseIcon, LogOut } from "lucide-react";
 
 // Create a context to manage the dashboard state
@@ -26,9 +26,9 @@ export const App = (): JSX.Element => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [apiStatus, setApiStatus] = useState<{ connected: boolean; message: string }>({ 
-    connected: false, 
-    message: "Checking API connection..." 
+  const [apiStatus, setApiStatus] = useState<{ connected: boolean; message: string }>({
+    connected: true,
+    message: ''
   });
   const [showApiNotification, setShowApiNotification] = useState(true);
   const [editItemId, setEditItemId] = useState<number | null>(null);
@@ -157,6 +157,31 @@ export const App = (): JSX.Element => {
     setEditItemId(itemId);
     setShowDashboard(true);
   };
+
+  // Inside the App component, before return statement, add:
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        const status = await checkApiConnectivity();
+        setApiStatus({
+          connected: status.connected,
+          message: status.message || ''
+        });
+        
+        if (!status.connected) {
+          console.error('API connection failed:', status.message);
+        }
+      } catch (error) {
+        console.error('Error checking API connection:', error);
+        setApiStatus({
+          connected: false,
+          message: error instanceof Error ? error.message : 'Unknown error checking API connection'
+        });
+      }
+    };
+
+    checkConnection();
+  }, []);
 
   if (!isAuthenticated) {
     return (
@@ -295,3 +320,38 @@ export const App = (): JSX.Element => {
     </DashboardContext.Provider>
   );
 };
+
+// Update the NetworkErrorFallback component to show more detailed error information
+const NetworkErrorFallback = () => (
+  <div className="fixed inset-0 bg-gradient-to-r from-rose-800/90 to-purple-900/90 flex flex-col items-center justify-center z-50 p-8">
+    <div className="bg-black/30 p-8 rounded-xl max-w-2xl w-full border border-white/10 shadow-xl">
+      <div className="flex flex-col items-center text-center space-y-6">
+        <div className="w-20 h-20 rounded-full bg-rose-500/20 flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-rose-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        
+        <h2 className="text-2xl font-bold text-white">API Connection Error</h2>
+        
+        <p className="text-white/80 text-lg">
+          {apiStatus?.message || 'Unable to connect to the API. Please check your connection and try again.'}
+        </p>
+        
+        <div className="bg-white/10 rounded-lg p-4 border border-white/10 w-full">
+          <h3 className="text-indigo-300 font-semibold mb-2">Mock Data Mode Enabled</h3>
+          <p className="text-white/70 text-sm">
+            The application is running in mock data mode. You can browse data, but changes will not be saved until API connectivity is restored.
+          </p>
+        </div>
+        
+        <button
+          onClick={() => window.location.reload()}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-md font-medium transition-colors mt-4"
+        >
+          Retry Connection
+        </button>
+      </div>
+    </div>
+  </div>
+);

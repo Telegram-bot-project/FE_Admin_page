@@ -14,7 +14,7 @@ import {
   ChevronDown, FileText, Tags, Save, PlusCircleIcon, 
   Plus, Check, ArrowLeft 
 } from "lucide-react"
-import { createItem, updateItem, type AdminInputKnowledgeItem, fileToBase64 } from "../../lib/db"
+import { createItem, updateItem, type AdminInputKnowledgeItem, fileToBase64, getCategories, VALID_CATEGORIES } from "../../lib/db"
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select"
 import { CategoryPopup } from "../../components/CategoryPopup/CategoryPopup"
@@ -93,7 +93,7 @@ const categoryTemplates: Record<string, ComponentVisibility> = {
     price: true,
     image: true
   },
-  "Tips": {
+  "FAQ": {
     name: true,
     date: false,
     time: false,
@@ -102,7 +102,7 @@ const categoryTemplates: Record<string, ComponentVisibility> = {
     price: false,
     image: true
   },
-  "Contact": {
+  "SOS assistants": {
     name: true,
     date: false,
     time: false,
@@ -171,6 +171,27 @@ export const Dashbroad = ({
 
   // Update UI layout to have more space for the map when it's displayed
   const [addressHasMap, setAddressHasMap] = useState(false);
+
+  const [categories, setCategories] = useState<string[]>(VALID_CATEGORIES);
+  const [isLoadingCategories, setIsLoadingCategories] = useState<boolean>(false);
+  
+  useEffect(() => {
+    const fetchCategories = async () => {
+      setIsLoadingCategories(true);
+      try {
+        const fetchedCategories = await getCategories();
+        setCategories(fetchedCategories);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+        // Fallback to default categories in case of error
+        setCategories(VALID_CATEGORIES);
+      } finally {
+        setIsLoadingCategories(false);
+      }
+    };
+  
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
     // Clear existing data first when entering edit mode
@@ -351,7 +372,8 @@ export const Dashbroad = ({
         ...formData,
         // All fields must be at least empty strings to satisfy the AdminInputKnowledgeItem type
         name: formData.name || "",
-        type: formData.type || "",
+        category: formData.type || "", // Map type to category for API compatibility
+        type: formData.type || "",     // Keep type for backward compatibility
         address: formData.address || "",
         description: formData.description || "",
         price: formData.price || "",
@@ -408,14 +430,15 @@ export const Dashbroad = ({
     }
   };
 
-  const categories: Category[] = [
+  // Rename the hardcoded categories array to categoryOptions
+  const categoryOptions: Category[] = [
     { id: 1, name: "Event", icon: "/public/img/Event.png" },
     { id: 2, name: "Food & Drink", icon: "/public/img/Food & Drink.png" },
     { id: 3, name: "Accommodation", icon: "/public/img/Accommodation.png" },
     { id: 4, name: "Sightseeing Spots", icon: "/public/img/Sightseeing Spots.png" },
     { id: 5, name: "Entertainment", icon: "/public/img/Entertainment.png" },
-    { id: 6, name: "Tips", icon: "/public/img/Tips.png" },
-    { id: 7, name: "Contact", icon: "/public/img/Contact.png" },
+    { id: 6, name: "FAQ", icon: "/public/img/FAQ.png" },
+    { id: 7, name: "SOS assistants", icon: "/public/img/SOS assistants.png" },
     { id: 8, name: "Create more", icon: "/public/img/_Create more_.png" },
   ];
 
@@ -750,7 +773,7 @@ export const Dashbroad = ({
         {/* Show category popup conditionally */}
         {showCategoryPopup && (
           <CategoryPopup
-            categories={categories}
+            categories={categoryOptions}
             isOpen={showCategoryPopup}
             onClose={() => setShowCategoryPopup(false)}
             onSelectCategory={handleCategorySelect}
