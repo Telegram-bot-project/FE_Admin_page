@@ -148,6 +148,13 @@ export const App = (): JSX.Element => {
   // Add fallback authentication state
   const [usingFallbackAuth, setUsingFallbackAuth] = useState(false);
 
+  // Log deployment status during initialization
+  useEffect(() => {
+    console.log(`App running in ${import.meta.env.PROD ? 'production' : 'development'} mode`);
+    console.log(`API URL: ${import.meta.env.VITE_API_URL}`);
+    console.log(`Deployment status: ${import.meta.env.VITE_DEPLOYED ? 'deployed' : 'local'}`);
+  }, []);
+
   // Memoize signOutRedirect function to prevent recreating it on every render
   const signOutRedirect = useCallback(() => {
     // Use the correct Cognito domain
