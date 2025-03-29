@@ -26,8 +26,12 @@ const getRedirectUri = () => {
   const hostname = window.location.hostname;
   
   // Handle production environment with CloudFront
-  if (hostname.includes('cloudfront.net') || process.env.NODE_ENV === 'production') {
-    return "https://d84l1y8p4kdic.cloudfront.net";
+  if (hostname.includes('cloudfront.net')) {
+    // Use the actual hostname from the current URL instead of hardcoding
+    return `${window.location.protocol}//${window.location.host}`;
+  } else if (import.meta.env.PROD) {
+    // For other production environments
+    return `${window.location.protocol}//${window.location.host}`;
   }
   
   // Handle localhost and development environments

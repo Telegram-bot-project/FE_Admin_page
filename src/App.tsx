@@ -205,6 +205,32 @@ export const App = (): JSX.Element => {
   // Add fallback authentication state
   const [usingFallbackAuth, setUsingFallbackAuth] = useState(false);
 
+  // Diagnostic function to detect auth configuration issues
+  useEffect(() => {
+    console.log("=== Auth Configuration Diagnostic ===");
+    // Check if we're on the Cognito redirect URL that has no application integration
+    const isCognitoRedirectPage = 
+      document.title.includes("Successfully signed in") || 
+      window.location.href.includes("cloudfront.net/") && 
+      document.body.textContent?.includes("Amazon Cognito user pools");
+      
+    if (isCognitoRedirectPage) {
+      console.error("DETECTED: Stuck on Cognito redirect page");
+      console.error("This usually means your Cognito app client doesn't have the correct callback URL configured.");
+      console.log("Current URL:", window.location.href);
+      console.log("You need to add this URL to your Cognito App Client's allowed callback URLs in AWS Console");
+    }
+    
+    console.log("Current origin:", window.location.origin);
+    console.log("Auth settings:", auth.settings);
+    console.log("Auth state:", { 
+      isLoading: auth.isLoading, 
+      isAuthenticated: auth.isAuthenticated,
+      hasError: !!auth.error
+    });
+    console.log("===================================");
+  }, [auth]);
+
   // Log deployment status during initialization
   useEffect(() => {
     console.log(`App running in ${import.meta.env.PROD ? 'production' : 'development'} mode`);
@@ -222,8 +248,12 @@ export const App = (): JSX.Element => {
       const hostname = window.location.hostname;
       
       // Handle production environment with CloudFront
-      if (hostname.includes('cloudfront.net') || process.env.NODE_ENV === 'production') {
-        return "https://d84l1y8p4kdic.cloudfront.net";
+      if (hostname.includes('cloudfront.net')) {
+        // Use the actual hostname from the current URL instead of hardcoding
+        return `${window.location.protocol}//${window.location.host}`;
+      } else if (import.meta.env.PROD) {
+        // For other production environments
+        return `${window.location.protocol}//${window.location.host}`;
       }
       
       // Handle localhost and development environments
@@ -281,9 +311,27 @@ export const App = (): JSX.Element => {
 
   // Handle login action
   const handleLogin = useCallback(() => {
-    auth.signinRedirect().catch(error => {
-      console.error('Error during sign-in redirect:', error);
-    });
+    try {
+      console.log("Starting sign-in redirect with the following configuration:");
+      console.log("- Redirect URI:", auth.settings.redirect_uri);
+      console.log("- Authority:", auth.settings.authority);
+      console.log("- Client ID:", auth.settings.client_id);
+      
+      auth.signinRedirect()
+        .then(() => {
+          console.log("Sign-in redirect initiated successfully");
+        })
+        .catch(error => {
+          console.error('Error during sign-in redirect:', error);
+          // Display user-friendly error in the console
+          console.log("Authentication failed. Please check AWS Cognito configuration in the AWS Console:");
+          console.log("1. Verify that the App Client has the correct callback URLs");
+          console.log("2. Make sure the domains are allowed in the App Client settings");
+          console.log(`3. Ensure the current domain (${window.location.origin}) is whitelisted`);
+        });
+    } catch (error) {
+      console.error("Exception during login initialization:", error);
+    }
   }, [auth]);
 
   // Handle retry for auth errors
