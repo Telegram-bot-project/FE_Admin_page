@@ -317,6 +317,13 @@ export const Dashbroad = ({
     // Update form data with the selected category type
     setFormData(prev => {
       const updated = { ...prev, type: selectedCategory.name };
+      
+      // Special handling for SOS assistants category
+      if (selectedCategory.name === "SOS assistants" && updated.description && 
+          !updated.description.includes("Phone number:") && updated.description.trim() !== "") {
+        updated.description = "Phone number: " + updated.description;
+      }
+      
       console.log("Updated form data:", updated);
       return updated;
     });
@@ -324,6 +331,31 @@ export const Dashbroad = ({
     // Apply the template for the selected category
     if (categoryTemplates[selectedCategory.name]) {
       setVisibleComponents(categoryTemplates[selectedCategory.name]);
+      
+      // Customize visible components for special categories
+      if (selectedCategory.name === "FAQ") {
+        // FAQ needs only name (question) and description (answer)
+        setVisibleComponents({
+          name: true,           // Question
+          description: true,    // Answer
+          date: false,
+          time: false,
+          address: false,
+          price: false,
+          image: true           // Keep image support for FAQ entries
+        });
+      } else if (selectedCategory.name === "SOS assistants") {
+        // SOS assistants needs name (support type), description (with phone), and address
+        setVisibleComponents({
+          name: true,           // Support Type
+          description: true,    // Description with phone
+          address: true,        // Address is important for SOS contacts
+          date: false,
+          time: false,
+          price: false,
+          image: true           // Keep image support
+        });
+      }
     } else if (selectedCategory.name === "Create Custom") {
       // If "Create Custom" is selected, handle it differently
       setShowCustomNameInput(true);
@@ -845,12 +877,16 @@ export const Dashbroad = ({
               {visibleComponents.name && (
                 <div className="space-y-3">
                   <label className="block text-sm font-medium text-white/70">
-                    Name <span className="text-red-400">*</span>
+                    {formData.type === "FAQ" ? "Question" : 
+                     formData.type === "SOS assistants" ? "Support Type" : 
+                     "Name"} <span className="text-red-400">*</span>
                   </label>
                   <Input
                     value={formData.name}
                     onChange={(e) => handleInputChange('name', e.target.value)}
-                    placeholder="Enter name"
+                    placeholder={formData.type === "FAQ" ? "Enter question" : 
+                                formData.type === "SOS assistants" ? "Enter support type" :
+                                "Enter name"}
                     className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                     required
                   />
@@ -1220,12 +1256,31 @@ export const Dashbroad = ({
               {/* Description */}
               {visibleComponents.description && (
                 <div className="space-y-3">
-                  <label className="block text-sm font-medium text-white/70">Description</label>
+                  <label className="block text-sm font-medium text-white/70">
+                    {formData.type === "FAQ" ? "Answer" : "Description"}
+                    {formData.type === "SOS assistants" && (
+                      <span className="text-indigo-300 ml-1 text-xs">(include phone number)</span>
+                    )}
+                  </label>
                   <Textarea
                     value={formData.description}
-                    onChange={(e) => handleInputChange('description', e.target.value)}
-                    placeholder="Enter description"
-                    className="bg-white/5 border-white/10 text-white placeholder:text-white/30 min-h-[120px]"
+                    onChange={(e) => {
+                      let value = e.target.value;
+                      
+                      // For SOS assistants, ensure phone number format if not already present
+                      if (formData.type === "SOS assistants" && !value.includes("Phone number:") && value.trim() !== "") {
+                        // Only prepend if the user is typing something and hasn't already included phone number format
+                        if (!value.toLowerCase().includes("phone") && !value.match(/^\s*phone number:/i)) {
+                          value = "Phone number: " + value;
+                        }
+                      }
+                      
+                      handleInputChange('description', value);
+                    }}
+                    placeholder={formData.type === "FAQ" ? "Enter answer" : 
+                                 formData.type === "SOS assistants" ? "Phone number: +1-234-567-8900\nAdditional information..." : 
+                                 "Enter description"}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/30 min-h-[150px]"
                   />
                 </div>
               )}

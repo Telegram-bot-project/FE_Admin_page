@@ -18,9 +18,10 @@ export interface DatabaseState {
   clearPendingChanges: () => void;
   hasPendingChanges: () => boolean;
   
-  // Add these new properties
+  // Database update properties and methods
   databaseUpdated: boolean;     // Flag indicating database was updated
   lastUpdateTime: number;       // Timestamp of last update
+  handleDatabaseUpdated: () => void;  // Method to mark database as updated
 }
 
 export const useDatabase = create<DatabaseState>((set, get) => ({
@@ -28,6 +29,7 @@ export const useDatabase = create<DatabaseState>((set, get) => ({
   pendingUpdates: [],
   pendingDeletions: new Set<number>(),
   
+  // Actions
   addPendingCreation: (item) => set((state) => ({
     pendingCreations: [...state.pendingCreations, item]
   })),
@@ -82,19 +84,11 @@ export const useDatabase = create<DatabaseState>((set, get) => ({
            pendingDeletions.size > 0
   },
   
-  // Add new state properties
+  // Database update state and methods
   databaseUpdated: false,
   lastUpdateTime: Date.now(),
   
-  // Update the methods that modify the database to set these flags
-  
-  // In resetState or a similar method
-  resetDatabaseUpdateFlags: () => set({ databaseUpdated: false }),
-  
-  // In database update methods, add this line:
-  // set({ databaseUpdated: true, lastUpdateTime: Date.now() });
-  
-  // For example, in the method that handles database updates
+  // Method to mark database as updated and clear pending changes
   handleDatabaseUpdated: () => {
     set({ 
       databaseUpdated: true, 

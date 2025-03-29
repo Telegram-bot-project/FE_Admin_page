@@ -299,6 +299,14 @@ export const OrderListSection = ({
 
   // Render the orders table
   const renderOrdersTable = (itemsToRender: KnowledgeItem[]) => {
+    // We need a consistent table structure for all items to prevent layout issues
+    const isGrouped = !!groupByCategory;
+    const isFAQTable = groupByCategory === "FAQ";
+    const isSOSTable = groupByCategory === "SOS assistants";
+    
+    // Show all columns by default in the main listing view
+    const showAllColumns = !isGrouped;
+    
     return (
       <div className="overflow-x-auto rounded-lg border border-white/10 bg-white/[0.02] shadow-lg backdrop-blur-[2px]">
         <Table>
@@ -322,19 +330,42 @@ export const OrderListSection = ({
                 </TableHead>
               )}
               <TableHead className="w-[80px] text-white/80 font-medium uppercase text-xs tracking-wider text-center">Image</TableHead>
-              <TableHead className="w-[180px] text-white/80 font-medium uppercase text-xs tracking-wider">Name</TableHead>
-              <TableHead className="w-[100px] text-white/80 font-medium uppercase text-xs tracking-wider">Date</TableHead>
-              <TableHead className="w-[80px] text-white/80 font-medium uppercase text-xs tracking-wider">Time</TableHead>
-              <TableHead className="w-[80px] text-white/80 font-medium uppercase text-xs tracking-wider">Price</TableHead>
+              <TableHead className="w-[180px] text-white/80 font-medium uppercase text-xs tracking-wider">
+                {isFAQTable ? "Question" : isSOSTable ? "Support Type" : "Name"}
+              </TableHead>
+              
+              {/* Date, Time, Price headers - always show in main listing, hide in FAQ group view */}
+              {(showAllColumns || !isFAQTable) && (
+                <>
+                  <TableHead className="w-[100px] text-white/80 font-medium uppercase text-xs tracking-wider">Date</TableHead>
+                  <TableHead className="w-[80px] text-white/80 font-medium uppercase text-xs tracking-wider">Time</TableHead>
+                  <TableHead className="w-[80px] text-white/80 font-medium uppercase text-xs tracking-wider">Price</TableHead>
+                </>
+              )}
+              
+              {/* Always show Address header */}
               <TableHead className="w-[180px] text-white/80 font-medium uppercase text-xs tracking-wider">Address</TableHead>
-              <TableHead className="text-white/80 font-medium uppercase text-xs tracking-wider hidden md:table-cell">Description</TableHead>
-              <TableHead className="w-[120px] text-white/80 font-medium uppercase text-xs tracking-wider">Type</TableHead>
+              
+              <TableHead className="text-white/80 font-medium uppercase text-xs tracking-wider hidden md:table-cell">
+                {isFAQTable ? "Answer" : isSOSTable ? "Contact Information" : "Description"}
+              </TableHead>
+              
+              {/* Type header - always show in main listing, hide in grouped views */}
+              {(showAllColumns || (!isFAQTable && !isSOSTable)) && (
+                <TableHead className="w-[120px] text-white/80 font-medium uppercase text-xs tracking-wider">Type</TableHead>
+              )}
+              
               <TableHead className="w-[140px] text-center text-white/80 font-medium uppercase text-xs tracking-wider">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {itemsToRender.length > 0 ? (
-              itemsToRender.map((order) => (
+              itemsToRender.map((order) => {
+                // Extract phone number for SOS assistants
+                const phoneNumber = order.type === "SOS assistants" && order.description ? 
+                  order.description.match(/Phone number:[^\n]*/)?.[0] : null;
+                
+                return (
                 <TableRow 
                   key={order.id} 
                   className={`border-t border-white/5 hover:bg-white/[0.05] transition-all duration-200 group table-row-hover ${selectedItems.has(order.id) ? 'bg-indigo-900/20' : ''}`}
@@ -357,6 +388,8 @@ export const OrderListSection = ({
                       </div>
                     </TableCell>
                   )}
+                  
+                  {/* Image cell - always show */}
                   <TableCell className="text-center py-2">
                     <div className="relative w-12 h-12 rounded overflow-hidden mx-auto bg-black/30 border border-white/5 group image-hover-zoom">
                       {order.image ? (
@@ -388,42 +421,72 @@ export const OrderListSection = ({
                       )}
                     </div>
                   </TableCell>
+                  
+                  {/* Name/Question/Support Type cell - always show */}
                   <TableCell className="font-medium text-white group-hover:text-indigo-200 transition-colors table-cell-optimize" 
                     data-tooltip={order.name || "Untitled Item"}>
                     <div className="truncate-cell overflow-tooltip">
                       {order.name || "Untitled Item"}
                     </div>
                   </TableCell>
-                  <TableCell className="text-white/80">
-                    {formatDate(order.date)}
-                  </TableCell>
-                  <TableCell className="text-white/80">
-                    {order.time || "N/A"}
-                  </TableCell>
-                  <TableCell className="text-white/80">
-                    {order.price ? (
-                      <span className="font-medium text-green-400">{order.price}</span>
-                    ) : (
-                      <span className="text-white/50">Free</span>
-                    )}
-                  </TableCell>
+                  
+                  {/* Date/Time/Price cells - conditionally show based on type and view mode */}
+                  {(showAllColumns || order.type !== "FAQ") ? (
+                    <>
+                      <TableCell className="text-white/80">
+                        {formatDate(order.date)}
+                      </TableCell>
+                      <TableCell className="text-white/80">
+                        {order.time || "N/A"}
+                      </TableCell>
+                      <TableCell className="text-white/80">
+                        {order.price ? (
+                          <span className="font-medium text-green-400">{order.price}</span>
+                        ) : (
+                          <span className="text-white/50">Free</span>
+                        )}
+                      </TableCell>
+                    </>
+                  ) : (
+                    // Hidden spanning cell for FAQ items when in grouped view
+                    <TableCell colSpan={3} className="hidden"></TableCell>
+                  )}
+                  
+                  {/* Address cell - always show (may be empty for FAQ) */}
                   <TableCell className="text-white/80 table-cell-optimize" data-tooltip={order.address || "N/A"}>
                     <div className="truncate-cell overflow-tooltip">
                       {order.address || "N/A"}
                     </div>
                   </TableCell>
+                  
+                  {/* Description/Answer/Contact cell - always show */}
                   <TableCell className="text-white/80 hidden md:table-cell">
-                    <div className="line-clamp-2 multiline-truncate" data-tooltip={order.description || 'No description'}>
-                      {order.description || 'No description'}
-                    </div>
+                    {order.type === "SOS assistants" && phoneNumber ? (
+                      <div className="line-clamp-2 multiline-truncate font-medium text-red-300" data-tooltip={order.description || 'No contact information'}>
+                        {phoneNumber}
+                      </div>
+                    ) : (
+                      <div className="line-clamp-2 multiline-truncate" data-tooltip={order.description || 'No description'}>
+                        {order.description || 'No description'}
+                      </div>
+                    )}
                   </TableCell>
-                  <TableCell>
-                    <span 
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium inline-flex items-center justify-center ${getTypeStyle(order.type || "Custom").bg} ${getTypeStyle(order.type || "Custom").text} border ${getTypeStyle(order.type || "Custom").border} transition-transform group-hover:scale-105`}
-                    >
-                      {order.type || "Custom"}
-                    </span>
-                  </TableCell>
+                  
+                  {/* Type cell - conditionally show based on type and view mode */}
+                  {(showAllColumns || (order.type !== "FAQ" && order.type !== "SOS assistants")) ? (
+                    <TableCell>
+                      <span 
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium inline-flex items-center justify-center ${getTypeStyle(order.type || "Custom").bg} ${getTypeStyle(order.type || "Custom").text} border ${getTypeStyle(order.type || "Custom").border} transition-transform group-hover:scale-105`}
+                      >
+                        {order.type || "Custom"}
+                      </span>
+                    </TableCell>
+                  ) : (
+                    // Hidden cell for FAQ/SOS items when in grouped view
+                    <TableCell className="hidden"></TableCell>
+                  )}
+                  
+                  {/* Actions cell - always show */}
                   <TableCell>
                     <div className="flex items-center justify-center gap-2 opacity-80 group-hover:opacity-100 transition-opacity action-button-group">
                       <Tooltip content="View Details">
@@ -467,10 +530,20 @@ export const OrderListSection = ({
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
+              )})
             ) : (
               <TableRow>
-                <TableCell colSpan={isSelectionMode ? 10 : 9} className="text-center py-12 text-white/50">
+                <TableCell colSpan={
+                  // Calculate the number of columns based on what's visible
+                  1 + // Image (always shown)
+                  1 + // Name/Question/Support (always shown)
+                  (showAllColumns || !isFAQTable ? 3 : 0) + // Date, Time, Price columns
+                  1 + // Address (always shown)
+                  1 + // Description (always shown)
+                  (showAllColumns || (!isFAQTable && !isSOSTable) ? 1 : 0) + // Type column
+                  1 + // Actions (always shown)
+                  (isSelectionMode ? 1 : 0) // Selection checkbox column
+                } className="text-center py-12 text-white/50">
                   <div className="flex flex-col items-center justify-center space-y-3 animate-pulse-subtle">
                     {error ? (
                       <AlertCircle className="h-7 w-7 text-white/30" />

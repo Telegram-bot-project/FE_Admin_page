@@ -91,6 +91,14 @@ const ItemViewModal = ({ item, onClose }: { item: KnowledgeItem, onClose: () => 
     }
   };
 
+  // Determine item type for specialized display
+  const isFAQ = item.type === "FAQ";
+  const isSOS = item.type === "SOS assistants";
+  
+  // Extract phone number for SOS items for quick reference
+  const phoneNumber = isSOS && item.description ? 
+    item.description.match(/Phone number:[^\n]*/)?.[0] : null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
@@ -104,7 +112,9 @@ const ItemViewModal = ({ item, onClose }: { item: KnowledgeItem, onClose: () => 
         <div className="sticky top-0 z-10 backdrop-blur-md bg-[#252136]/80 border-b border-white/10 p-4 flex justify-between items-center">
           <h2 className="text-xl font-bold text-white flex items-center">
             <Info className="w-5 h-5 mr-2 text-indigo-400" />
-            Item Details
+            {isFAQ ? "FAQ Details" : 
+             isSOS ? "SOS Contact Details" :
+             "Item Details"}
           </h2>
           <Button
             variant="ghost"
@@ -119,26 +129,34 @@ const ItemViewModal = ({ item, onClose }: { item: KnowledgeItem, onClose: () => 
         </div>
         
         <div className="p-6">
-          {/* Schema visualization */}
-          <div className="mb-6 bg-black/30 border border-white/10 rounded-lg p-4 overflow-auto">
-            <img 
-              src={item.image || '/img/placeholder.png'} 
-              alt={item.name}
-              className="max-w-full h-auto rounded-md object-cover mb-4 max-h-[200px] w-full"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = '/img/placeholder.png';
-              }}
-            />
-          </div>
+          {/* Image section */}
+          {item.image && (
+            <div className="mb-6 bg-black/30 border border-white/10 rounded-lg p-4 overflow-auto">
+              <img 
+                src={item.image || '/img/placeholder.png'} 
+                alt={item.name}
+                className="max-w-full h-auto rounded-md object-cover mb-4 max-h-[200px] w-full"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/img/placeholder.png';
+                }}
+              />
+            </div>
+          )}
 
           {/* Item details */}
           <div className="space-y-4">
+            {/* Primary field (Name/Question/Support Type) */}
             <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-              <h3 className="text-white/50 text-sm font-medium mb-1">Name</h3>
+              <h3 className="text-white/50 text-sm font-medium mb-1">
+                {isFAQ ? "Question" : 
+                 isSOS ? "Support Type" : 
+                 "Name"}
+              </h3>
               <p className="text-white text-lg font-medium">{item.name || 'Untitled'}</p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Category */}
               <div className="bg-white/5 border border-white/10 rounded-lg p-4">
                 <h3 className="text-white/50 text-sm font-medium mb-1">Category</h3>
                 <div>
@@ -148,6 +166,8 @@ const ItemViewModal = ({ item, onClose }: { item: KnowledgeItem, onClose: () => 
                       item.type === "Food & Beverage" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" :
                       item.type === "Tips" ? "bg-red-500/20 text-red-300 border border-red-500/30" :
                       item.type === "Contact" ? "bg-pink-500/20 text-pink-300 border border-pink-500/30" :
+                      item.type === "FAQ" ? "bg-blue-500/20 text-blue-300 border border-blue-500/30" :
+                      item.type === "SOS assistants" ? "bg-red-500/20 text-red-300 border border-red-500/30" :
                       "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
                     }`}
                   >
@@ -156,6 +176,7 @@ const ItemViewModal = ({ item, onClose }: { item: KnowledgeItem, onClose: () => 
                 </div>
               </div>
               
+              {/* Timestamps */}
               <div className="bg-white/5 border border-white/10 rounded-lg p-4">
                 <h3 className="text-white/50 text-sm font-medium mb-1">Created</h3>
                 <p className="text-white">{formatDate(item.created_at)}</p>
@@ -166,24 +187,54 @@ const ItemViewModal = ({ item, onClose }: { item: KnowledgeItem, onClose: () => 
                 <p className="text-white">{formatDate(item.updated_at)}</p>
               </div>
               
-              {item.price && (
+              {/* Time & Date - Only show for non-FAQ items */}
+              {!isFAQ && item.date && (
+                <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                  <h3 className="text-white/50 text-sm font-medium mb-1">Date</h3>
+                  <p className="text-white">{item.date}</p>
+                </div>
+              )}
+              
+              {!isFAQ && item.time && (
+                <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                  <h3 className="text-white/50 text-sm font-medium mb-1">Time</h3>
+                  <p className="text-white">{item.time}</p>
+                </div>
+              )}
+              
+              {/* Price - Only show for items with price and non-FAQ */}
+              {!isFAQ && item.price && (
                 <div className="bg-white/5 border border-white/10 rounded-lg p-4">
                   <h3 className="text-white/50 text-sm font-medium mb-1">Price</h3>
                   <p className="text-white">{item.price}</p>
                 </div>
               )}
               
-              {item.address && (
+              {/* Address - Show for non-FAQ or SOS items */}
+              {(item.address && (!isFAQ || isSOS)) && (
                 <div className="bg-white/5 border border-white/10 rounded-lg p-4 md:col-span-2">
                   <h3 className="text-white/50 text-sm font-medium mb-1">Address</h3>
                   <p className="text-white">{item.address}</p>
                 </div>
               )}
               
+              {/* Description/Answer - All item types */}
               {item.description && (
                 <div className="bg-white/5 border border-white/10 rounded-lg p-4 md:col-span-2">
-                  <h3 className="text-white/50 text-sm font-medium mb-1">Description</h3>
+                  <h3 className="text-white/50 text-sm font-medium mb-1">
+                    {isFAQ ? "Answer" : "Description"}
+                  </h3>
                   <p className="text-white whitespace-pre-wrap">{item.description}</p>
+                </div>
+              )}
+
+              {/* Phone number extraction for SOS assistants for quick reference */}
+              {isSOS && phoneNumber && (
+                <div className="bg-red-950/30 border border-red-500/30 rounded-lg p-4 md:col-span-2">
+                  <h3 className="text-red-300 text-sm font-medium mb-1">Quick Contact</h3>
+                  <p className="text-white font-medium">
+                    {phoneNumber}
+                  </p>
                 </div>
               )}
             </div>
