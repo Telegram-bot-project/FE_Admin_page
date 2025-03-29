@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, memo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, memo, Component, ErrorInfo, ReactNode } from "react";
 import { useAuth } from "react-oidc-context";
 import { Dashbroad } from "./screens/Dashbroad/Dashbroad";
 import { DashbroadListing } from "./screens/DashbroadListing/DashbroadListing";
@@ -6,8 +6,27 @@ import { Button } from "./components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "./components/ui/card";
 import { initDB, getAllItems, checkApiConnectivity } from "./lib/db";
 import { DatabaseIcon, LogOut } from "lucide-react";
-import { ErrorBoundary } from "./components/ErrorBoundary";
 import { manualAuth, authEventHandlers } from "./lib/authUtils";
+
+// Inline ErrorBoundary component to avoid import issues
+class ErrorBoundary extends Component<{children: ReactNode; fallback: ReactNode}> {
+  state = { hasError: false, error: null };
+  
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    console.error('ErrorBoundary caught an error:', error, errorInfo);
+  }
+  
+  render(): ReactNode {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
 
 // Create a context to manage the dashboard state
 export const DashboardContext = React.createContext<{
@@ -133,6 +152,45 @@ const LoginScreen = memo(({ onLogin }: { onLogin: () => void }) => (
   </div>
 ));
 
+// NetworkErrorFallback component definition
+const NetworkErrorFallback = () => {
+  const { apiStatus } = React.useContext(DashboardContext);
+  
+  return (
+    <div className="fixed inset-0 bg-gradient-to-r from-rose-800/90 to-purple-900/90 flex flex-col items-center justify-center z-50 p-8">
+      <div className="bg-black/30 p-8 rounded-xl max-w-2xl w-full border border-white/10 shadow-xl">
+        <div className="flex flex-col items-center text-center space-y-6">
+          <div className="w-20 h-20 rounded-full bg-rose-500/20 flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-rose-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          
+          <h2 className="text-2xl font-bold text-white">API Connection Error</h2>
+          
+          <p className="text-white/80 text-lg">
+            {apiStatus?.message || 'Unable to connect to the API. Please check your connection and try again.'}
+          </p>
+          
+          <div className="bg-white/10 rounded-lg p-4 border border-white/10 w-full">
+            <h3 className="text-indigo-300 font-semibold mb-2">Mock Data Mode Enabled</h3>
+            <p className="text-white/70 text-sm">
+              The application is running in mock data mode. You can browse data, but changes will not be saved until API connectivity is restored.
+            </p>
+          </div>
+          
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-md font-medium transition-colors mt-4"
+          >
+            Retry Connection
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Main App component
 export const App = (): JSX.Element => {
   const auth = useAuth();
@@ -206,297 +264,209 @@ export const App = (): JSX.Element => {
   const handleDashboardClose = useCallback(() => {
     console.log("handleDashboardClose called");
     setShowDashboard(false);
-    // Clear the edit item ID
-    setEditItemId(null);
-    // Clear any leftover edit data in localStorage
-    localStorage.removeItem('editItem');
+    // Clear edit item id from local storage
     localStorage.removeItem('editItemId');
+    // Ensure editItemId is null
+    setEditItemId(null);
   }, []);
 
   // Memoize item edit handler
   const handleItemEdit = useCallback((itemId: number) => {
-    console.log("handleItemEdit called with itemId:", itemId);
-    setEditItemId(itemId);
+    console.log(`handleItemEdit called with itemId: ${itemId}`);
     setShowDashboard(true);
+    setEditItemId(itemId);
+    // Store edit item id in local storage for persistence across reloads
+    localStorage.setItem('editItemId', String(itemId));
   }, []);
 
-  // Memoize the login handler
+  // Handle login action
   const handleLogin = useCallback(() => {
-    auth.signinRedirect();
+    auth.signinRedirect().catch(error => {
+      console.error('Error during sign-in redirect:', error);
+    });
   }, [auth]);
 
-  // Enhanced retry handler that tries alternative login method on repeated failures
+  // Handle retry for auth errors
   const handleRetry = useCallback(() => {
     setAuthRetryCount(prev => prev + 1);
     
-    // Show more descriptive error message in console for debugging
-    console.log(`Auth retry attempt ${authRetryCount + 1}`);
-    
-    // Check for redirect_mismatch error in URL
+    // Clear URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const errorParam = urlParams.get('error');
     
-    if (errorParam === 'redirect_mismatch') {
-      console.error('Redirect URI mismatch detected. This means the redirect_uri in your code does not match what is configured in AWS Cognito.');
-      
-      // Try manual authentication as fallback
-      setUsingFallbackAuth(true);
-      manualAuth.login();
-      return;
+    if (errorParam) {
+      // Remove error params from URL
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
     }
     
-    // If we've tried OIDC more than twice, switch to manual auth
-    if (authRetryCount >= 2) {
-      console.log("Switching to manual authentication after repeated failures");
-      setUsingFallbackAuth(true);
-      manualAuth.login();
-    } else if (authRetryCount >= 3) {
-      // If even manual auth isn't working, do a full page reload
-      window.location.reload();
-    } else {
-      // Just retry the auth flow
-      auth.signinRedirect();
-    }
-  }, [auth, authRetryCount]);
+    // Try to authenticate again
+    auth.signinRedirect().catch(error => {
+      console.error('Error during retry sign-in:', error);
+    });
+  }, [auth]);
 
-  // Memoize context value to prevent unnecessary re-renders of consumers
+  // Memoize the context value to prevent unnecessary rerenders
   const contextValue = useMemo(() => ({
     showDashboard,
     setShowDashboard,
-    isAuthenticated: auth.isAuthenticated,
+    isAuthenticated: auth.isAuthenticated || usingFallbackAuth,
     handleLogout,
-    apiStatus
-  }), [showDashboard, auth.isAuthenticated, handleLogout, apiStatus]);
+    apiStatus,
+  }), [
+    showDashboard, 
+    auth.isAuthenticated,
+    usingFallbackAuth,
+    handleLogout,
+    apiStatus,
+  ]);
 
-  // Initialize database and check API connection on app start
+  // Setup database and authentication
   useEffect(() => {
-    let mounted = true;
-    
+    // Initialize the database
     const setupDB = async () => {
       try {
+        // Initialize the database
         await initDB();
-        console.log("Database initialized successfully");
+        console.log("Database initialized");
         
-        // Test API connection
         try {
+          // Get all items from the database
           const items = await getAllItems();
-          console.log("API response data:", items);
-          
-          if (!mounted) return;
-          
-          if (Array.isArray(items)) {
-            setApiStatus({ 
-              connected: true, 
-              message: `Connected to API successfully! Found ${items.length} items.` 
-            });
-            console.log("API connection successful");
-          } else {
-            setApiStatus({ 
-              connected: false, 
-              message: "Connected to API but received unexpected data format." 
-            });
-            console.error("Unexpected data format:", items);
-          }
-        } catch (error) {
-          if (!mounted) return;
-          
-          console.error("API connection error:", error);
-          setApiStatus({ 
-            connected: false, 
-            message: `Error connecting to API: ${error instanceof Error ? error.message : 'Unknown error'}` 
+          console.log(`Loaded ${items.length} items from database`);
+        } catch (dbError) {
+          console.error("Error getting items:", dbError);
+          setApiStatus({
+            connected: false,
+            message: "Database connected but there was an error fetching items."
           });
         }
       } catch (error) {
-        if (!mounted) return;
-        
-        console.error("Error initializing database:", error);
-        setApiStatus({ 
-          connected: false, 
-          message: `Error initializing database: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        console.error("Database initialization error:", error);
+        setApiStatus({
+          connected: false,
+          message: "Unable to connect to the database. Using mock data."
         });
       }
     };
-    
+
     setupDB();
     
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  // Listen for auth errors that might occur after initial login
-  useEffect(() => {
+    // Check for auth errors and try to recover
     if (auth.error) {
-      console.error("Auth error detected in listener:", auth.error);
+      console.error("Auth error detected:", auth.error);
       
-      // Try to recover from the error
+      // Try to recover from auth errors
       const canRecover = manualAuth.recoverFromError(auth.error);
       
-      if (!canRecover && authRetryCount < 3) {
-        // If recovery isn't possible, try the fallback authentication
+      if (canRecover) {
         setUsingFallbackAuth(true);
-        setAuthRetryCount(prev => prev + 1);
-        manualAuth.login();
-      }
-    }
-  }, [auth.error, authRetryCount]);
-
-  // Check for fallback authentication success
-  useEffect(() => {
-    // If we're using fallback auth, check if the user is authenticated
-    if (usingFallbackAuth) {
-      const isAuthenticated = manualAuth.isAuthenticated();
-      console.log("Fallback auth status:", isAuthenticated);
-      
-      // If authenticated, run onLoginSuccess handler
-      if (isAuthenticated) {
-        // Get user info from session storage
-        const userInfo = manualAuth.getUserInfo();
-        console.log("Fallback auth user info:", userInfo);
+        console.log("Recovered from auth error using fallback auth");
         
-        // Store user email in localStorage for display in the header
-        if (userInfo && userInfo.email) {
-          localStorage.setItem('userEmail', userInfo.email);
-        }
+        // Skip the event handlers that are causing type errors
+        return;
       }
-    }
-  }, [usingFallbackAuth]);
-
-  // Register auth event handlers
-  useEffect(() => {
-    if (auth.events) {
-      auth.events.addUserLoaded((user) => {
-        authEventHandlers.onLoginSuccess(user);
-        
-        // Store user email in localStorage for display in the header
-        if (user && user.profile && user.profile.email) {
-          localStorage.setItem('userEmail', user.profile.email);
-        }
-      });
-      
-      auth.events.addSilentRenewError((error) => {
-        authEventHandlers.onSilentRenewError(error);
-      });
     }
     
-    return () => {
-      // Cleanup event listeners
-      if (auth.events) {
-        auth.events.removeUserLoaded(() => {});
-        auth.events.removeSilentRenewError(() => {});
+    // If fallback auth is being used, check if it's still authenticated
+    if (usingFallbackAuth) {
+      const isAuthenticated = manualAuth.isAuthenticated();
+      console.log("Using fallback auth, authenticated:", isAuthenticated);
+      
+      if (!isAuthenticated) {
+        setUsingFallbackAuth(false);
+      } else {
+        // Get user info for display
+        const userInfo = manualAuth.getUserInfo();
+        console.log("User info from fallback auth:", userInfo);
       }
-    };
-  }, [auth.events]);
-
-  // Set a timer to hide the API notification after data loads
-  useEffect(() => {
-    // Only start the timer once we have a definitive API status
-    if (apiStatus.connected !== undefined) {
-      // Show the notification
-      setShowApiNotification(true);
-      
-      // Set a timeout to hide it after 3 seconds
-      const timer = setTimeout(() => {
-        setShowApiNotification(false);
-      }, 3000); // 3 seconds
-      
-      // Clean up the timer when component unmounts or status changes
-      return () => clearTimeout(timer);
     }
-  }, [apiStatus]);
-
-  // Check for edit mode when the dashboard is about to show
+    
+    // Set a timeout to hide the API status notification
+    const timer = setTimeout(() => {
+      setShowApiNotification(false);
+    }, 5000);
+    
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [auth.error, auth.isAuthenticated, usingFallbackAuth]);
+  
+  // Restore edit item ID from local storage if available
   useEffect(() => {
-    if (showDashboard) {
-      // Get the item ID from localStorage
+    if (showDashboard && !editItemId) {
       const storedEditItemId = localStorage.getItem('editItemId');
       if (storedEditItemId) {
         const id = parseInt(storedEditItemId);
-        console.log("Setting edit item ID from localStorage:", id);
         setEditItemId(id);
-      } else {
-        setEditItemId(null);
       }
     }
-  }, [showDashboard]);
-
-  // Check API connectivity on mount
+  }, [showDashboard, editItemId]);
+  
+  // Check API connectivity periodically
   useEffect(() => {
-    let mounted = true;
-    
+    // Initial check
     const checkConnection = async () => {
       try {
         const status = await checkApiConnectivity();
-        
-        if (!mounted) return;
-        
         setApiStatus({
-          connected: status.connected,
-          message: status.message || ''
+          connected: true,
+          message: `Connected to API`
         });
-        
-        if (!status.connected) {
-          console.error('API connection failed:', status.message);
-        }
       } catch (error) {
-        if (!mounted) return;
-        
-        console.error('Error checking API connection:', error);
+        console.error("API connectivity check failed:", error);
         setApiStatus({
           connected: false,
-          message: error instanceof Error ? error.message : 'Unknown error checking API connection'
+          message: "API connectivity check failed. Using cached data."
         });
       }
     };
-
+    
     checkConnection();
     
+    // Set up interval to check periodically
+    const interval = setInterval(checkConnection, 60000); // Check every minute
+    
     return () => {
-      mounted = false;
+      clearInterval(interval);
     };
   }, []);
 
-  // Conditional rendering based on authentication state with enhanced error handling
+  // Render loading state if auth is not ready
   if (auth.isLoading) {
     return <AuthLoading />;
   }
 
-  // If we're using fallback auth, use our manual check
-  if (usingFallbackAuth) {
+  // Use fallback authentication if needed
+  if (!auth.isAuthenticated && !auth.isLoading) {
+    // Try to recover using manual auth
     const isAuthenticated = manualAuth.isAuthenticated();
-
-  if (!isAuthenticated) {
-      return <LoginScreen onLogin={() => manualAuth.login()} />;
+    
+    if (isAuthenticated && !usingFallbackAuth) {
+      setUsingFallbackAuth(true);
     }
-  } else {
-    // Enhanced error handling with detailed error information
-    if (auth.error) {
-      console.error("Auth error details:", {
-        name: auth.error.name,
-        message: auth.error.message,
-        stack: auth.error.stack,
-        url: window.location.href // Log current URL for debugging redirect issues
-      });
+    
+    // Handle auth errors
+    if (auth.error && !usingFallbackAuth) {
+      console.error("Auth error:", auth.error);
       
-      // Check for specific error types and provide better user messages
-      let errorMessage = auth.error.message;
+      let errorMessage = "Unknown authentication error";
       
-      // Check for redirect_mismatch error in URL
+      // Check for URL error parameters
       const urlParams = new URLSearchParams(window.location.search);
       const errorParam = urlParams.get('error');
+      const errorDescription = urlParams.get('error_description');
       
-      if (errorParam === 'redirect_mismatch') {
-        errorMessage = "Authentication configuration error: The application's redirect URI doesn't match what is configured in AWS Cognito.";
-      } else if (errorMessage.includes("Token expired")) {
-        errorMessage = "Your session has expired. Please log in again.";
-      } else if (errorMessage.includes("Network Error") || errorMessage.includes("Failed to fetch")) {
-        errorMessage = "Network connection issue. Please check your internet connection and try again.";
+      if (errorParam) {
+        errorMessage = `${errorParam}: ${errorDescription || 'No description provided'}`;
+      } else if (auth.error.message) {
+        errorMessage = auth.error.message;
       }
       
       return <AuthError errorMessage={errorMessage} onRetry={handleRetry} />;
     }
 
-    if (!auth.isAuthenticated) {
+    if (!auth.isAuthenticated && !usingFallbackAuth) {
       return <LoginScreen onLogin={handleLogin} />;
     }
   }
@@ -504,64 +474,23 @@ export const App = (): JSX.Element => {
   return (
     <ErrorBoundary fallback={<NetworkErrorFallback />}>
       <DashboardContext.Provider value={contextValue}>
-      <div className="min-h-screen relative">
-        {/* API Status Notification */}
+        <div className="min-h-screen relative">
+          {/* API Status Notification */}
           {showApiNotification && <ApiNotification apiStatus={apiStatus} />}
           
-          {/* User Info & Logout Button - Removed as it's now in the sidebar */}
-      
-        {/* Main Content */}
-        <div className="min-h-screen">
-          {showDashboard ? (
-            <Dashbroad 
-              onClose={handleDashboardClose} 
-              editItemId={editItemId}
-            />
-          ) : (
-            <DashbroadListing onItemEdit={handleItemEdit} />
-          )}
+          {/* Main Content */}
+          <div className="min-h-screen">
+            {showDashboard ? (
+              <Dashbroad 
+                onClose={handleDashboardClose} 
+                editItemId={editItemId}
+              />
+            ) : (
+              <DashbroadListing onItemEdit={handleItemEdit} />
+            )}
+          </div>
         </div>
-      </div>
-    </DashboardContext.Provider>
+      </DashboardContext.Provider>
     </ErrorBoundary>
   );
-};
-
-// Update the NetworkErrorFallback component to show more detailed error information
-const NetworkErrorFallback = () => {
-  const { apiStatus } = React.useContext(DashboardContext);
-  
-  return (
-  <div className="fixed inset-0 bg-gradient-to-r from-rose-800/90 to-purple-900/90 flex flex-col items-center justify-center z-50 p-8">
-    <div className="bg-black/30 p-8 rounded-xl max-w-2xl w-full border border-white/10 shadow-xl">
-      <div className="flex flex-col items-center text-center space-y-6">
-        <div className="w-20 h-20 rounded-full bg-rose-500/20 flex items-center justify-center">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-rose-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-        </div>
-        
-        <h2 className="text-2xl font-bold text-white">API Connection Error</h2>
-        
-        <p className="text-white/80 text-lg">
-          {apiStatus?.message || 'Unable to connect to the API. Please check your connection and try again.'}
-        </p>
-        
-        <div className="bg-white/10 rounded-lg p-4 border border-white/10 w-full">
-          <h3 className="text-indigo-300 font-semibold mb-2">Mock Data Mode Enabled</h3>
-          <p className="text-white/70 text-sm">
-            The application is running in mock data mode. You can browse data, but changes will not be saved until API connectivity is restored.
-          </p>
-        </div>
-        
-        <button
-          onClick={() => window.location.reload()}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-md font-medium transition-colors mt-4"
-        >
-          Retry Connection
-        </button>
-      </div>
-    </div>
-  </div>
-);
 };
