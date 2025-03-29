@@ -1,20 +1,32 @@
-# Logs
-logs
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Build output
+/dist
+/build
+/out
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Cache and logs
+.cache/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
 .idea
 .DS_Store
 *.suo
@@ -23,13 +35,26 @@ dist-ssr
 *.sln
 *.sw?
 
+# Testing
+/coverage
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+
 package-lock.json
 
 *.pem
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
 .pytest_cache
 .vscode 
+
+__tests__
+map-test.html
+
+/scripts
+/src
+/public
+/docs
+/examples
+/test

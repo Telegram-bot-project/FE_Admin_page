@@ -1,7 +1,7 @@
 declare namespace google {
   namespace maps {
     class Map {
-      constructor(mapDiv: Element, opts?: MapOptions);
+      constructor(element: HTMLElement, options?: MapOptions);
       setCenter(latLng: LatLng | LatLngLiteral): void;
       setZoom(zoom: number): void;
       getCenter(): LatLng;
@@ -9,8 +9,9 @@ declare namespace google {
     }
 
     class Marker {
-      constructor(opts?: MarkerOptions);
+      constructor(options?: MarkerOptions);
       setPosition(latLng: LatLng | LatLngLiteral): void;
+      getPosition(): LatLng;
       setMap(map: Map | null): void;
     }
 
@@ -27,23 +28,30 @@ declare namespace google {
 
     namespace places {
       class Autocomplete {
-        constructor(inputElement: HTMLInputElement, opts?: AutocompleteOptions);
-        addListener(eventName: string, handler: () => void): MapsEventListener;
-        getPlace(): AutocompletePrediction;
-      }
-
-      interface AutocompletePrediction {
-        formatted_address?: string;
-        geometry?: {
-          location: LatLng;
-        };
+        constructor(inputElement: HTMLInputElement, options?: AutocompleteOptions);
+        getPlace(): PlaceResult;
+        bindTo(key: string, target: any): void;
+        addListener(eventName: string, handler: Function): void;
       }
 
       interface AutocompleteOptions {
-        bounds?: LatLngBounds | LatLngBoundsLiteral;
-        componentRestrictions?: ComponentRestrictions;
         fields?: string[];
         types?: string[];
+        componentRestrictions?: ComponentRestrictions;
+        bounds?: any;
+      }
+
+      interface ComponentRestrictions {
+        country: string | string[];
+      }
+
+      interface PlaceResult {
+        place_id?: string;
+        formatted_address?: string;
+        geometry?: {
+          location?: LatLng;
+        };
+        name?: string;
       }
     }
 
@@ -87,38 +95,71 @@ declare namespace google {
     interface MapOptions {
       center?: LatLng | LatLngLiteral;
       zoom?: number;
-      minZoom?: number;
-      maxZoom?: number;
-      styles?: MapTypeStyle[];
       mapTypeId?: string;
-      disableDefaultUI?: boolean;
-      zoomControl?: boolean;
       mapTypeControl?: boolean;
-      streetViewControl?: boolean;
       fullscreenControl?: boolean;
-      scrollwheel?: boolean;
-      draggable?: boolean;
-      disableDoubleClickZoom?: boolean;
-      clickableIcons?: boolean;
+      streetViewControl?: boolean;
+      zoomControl?: boolean;
+      styles?: any[];
     }
 
     interface MarkerOptions {
-      position: LatLng | LatLngLiteral;
+      position?: LatLng | LatLngLiteral;
       map?: Map;
       title?: string;
-      icon?: string | Icon | Symbol;
-      label?: string | MarkerLabel;
+      animation?: number;
       draggable?: boolean;
-      clickable?: boolean;
-      animation?: Animation;
+      icon?: string | Icon | Symbol;
     }
 
-    type Animation = 1 | 2 | 3 | 4;
+    interface Icon {
+      url?: string;
+      size?: Size;
+      scaledSize?: Size;
+      origin?: Point;
+      anchor?: Point;
+      labelOrigin?: Point;
+    }
+
+    interface Symbol {
+      path: string | number;
+      fillColor?: string;
+      fillOpacity?: number;
+      scale?: number;
+      strokeColor?: string;
+      strokeOpacity?: number;
+      strokeWeight?: number;
+    }
+
+    class Size {
+      constructor(width: number, height: number);
+      width: number;
+      height: number;
+    }
+
+    class Point {
+      constructor(x: number, y: number);
+      x: number;
+      y: number;
+    }
+
+    namespace event {
+      function addListener(instance: any, eventName: string, handler: Function): any;
+      function removeListener(listener: any): void;
+      function trigger(instance: any, eventName: string, ...args: any[]): void;
+    }
+
     const Animation: {
-      BOUNCE: 1;
-      DROP: 2;
-      Qn: 3;
-      Pn: 4;
+      DROP: number;
+      BOUNCE: number;
+    };
+
+    const SymbolPath: {
+      CIRCLE: number;
+      FORWARD_CLOSED_ARROW: number;
+      FORWARD_OPEN_ARROW: number;
+      BACKWARD_CLOSED_ARROW: number;
+      BACKWARD_OPEN_ARROW: number;
     };
 
     interface LatLngLiteral {
@@ -142,63 +183,6 @@ declare namespace google {
       east: number;
       south: number;
       west: number;
-    }
-
-    interface ComponentRestrictions {
-      country: string | string[];
-    }
-
-    interface Icon {
-      url: string;
-      size?: Size;
-      origin?: Point;
-      anchor?: Point;
-      scaledSize?: Size;
-    }
-
-    interface MarkerLabel {
-      text: string;
-      color?: string;
-      fontFamily?: string;
-      fontSize?: string;
-      fontWeight?: string;
-    }
-
-    interface Point {
-      x: number;
-      y: number;
-    }
-
-    interface Size {
-      width: number;
-      height: number;
-      equals(other: Size): boolean;
-    }
-
-    interface Symbol {
-      path: string | SymbolPath;
-      fillColor?: string;
-      fillOpacity?: number;
-      scale?: number;
-      strokeColor?: string;
-      strokeOpacity?: number;
-      strokeWeight?: number;
-    }
-
-    type SymbolPath = 0 | 1 | 2 | 3 | 4 | 5 | 6;
-
-    interface MapTypeStyle {
-      elementType?: string;
-      featureType?: string;
-      stylers: MapTypeStyler[];
-    }
-
-    interface MapTypeStyler {
-      [key: string]: string | number | boolean;
-    }
-
-    interface MapsEventListener {
-      remove(): void;
     }
   }
 } 

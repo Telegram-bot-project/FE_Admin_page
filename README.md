@@ -1,80 +1,123 @@
 # TeleBot Admin Dashboard
 
-A knowledge management system with a FastAPI backend and React frontend.
+A React-based admin dashboard for managing TeleBot data, featuring Google Maps integration for location-based content.
 
-## Deployment to Hugging Face Spaces
+## Features
 
-This application is designed to be deployed as a Docker-based Hugging Face Space.
+- 🗺️ Google Maps address search with autocomplete
+- 📱 Responsive design for desktop and mobile
+- 🔒 Secure authentication with AWS Cognito
+- 📊 Data management interface
+- 🌙 Dark-mode UI
 
-### Backend Deployment
+## Getting Started
 
-1. Create a new Hugging Face Space
-   - Go to [Hugging Face](https://huggingface.co/)
-   - Click on "New Space"
-   - Choose "Docker" as the Space SDK
-   - Name your space (e.g., "teleadmindb")
+### Prerequisites
 
-2. Configure Environment Variables in Hugging Face Space
-   - Go to your Space's settings
-   - Under "Repository secrets", add the following variables:
-     - `AIVEN_DB_URL`: Your Aiven PostgreSQL connection string
+- Node.js 16+ and npm
+- Google Maps API key with Places API enabled
+- AWS Cognito user pool for authentication
 
-3. Upload Backend Files
-   - Upload the following files to your Space:
-     - `app/app.py`
-     - `app/Dockerfile`
-     - `app/requirements.txt`
+### Installation
 
-### Frontend Configuration
-
-1. Update API URL in frontend
-   - The frontend is configured to connect to your Hugging Face Space API
-   - The API URL is set to `https://[your-username]-teleadmindb.hf.space/api`
-   - This can be modified in `src/lib/db.ts` if needed
-
-## Local Development
-
-### Backend
-
-1. Set up environment variables:
-   ```
-   DB_CONNECTION_MODE=local  # Or "aiven" to use PostgreSQL
-   AIVEN_DB_URL=your_aiven_postgresql_url  # Only needed if DB_CONNECTION_MODE=aiven
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-username/TeleBot-DB.git
+   cd TeleBot-DB/TeleAdminDB/TeleBot
    ```
 
 2. Install dependencies:
-   ```
-   pip install -r app/requirements.txt
-   ```
-
-3. Run the backend:
-   ```
-   cd app
-   uvicorn app:app --host 0.0.0.0 --port 3001
-   ```
-
-### Frontend
-
-1. Install dependencies:
-   ```
+   ```bash
    npm install
    ```
 
-2. Run the frontend:
+3. Create a `.env` file based on `.env.example`:
+   ```bash
+   cp .env.example .env
    ```
+
+4. Add your API keys and configuration values to the `.env` file.
+
+5. Start the development server:
+   ```bash
    npm run dev
    ```
 
 ## Testing
 
-Use the included test script to verify the API is working correctly:
-```
-cd app
-python test_api.py
+### Google Maps API Testing
+
+Test your Google Maps API key configuration:
+
+```bash
+npm run test:maps
 ```
 
-## Login Credentials
+This will create a test HTML file at `test/maps-test.html` that you can view in a browser:
 
-Use the following credentials to login to the admin dashboard:
-- Username: admin
-- Password: password 
+```bash
+npm run serve:test
+```
+
+### Unit Testing
+
+Run unit tests with Jest:
+
+```bash
+npm test
+```
+
+### Run All Tests
+
+To run all tests and checks in sequence:
+
+```bash
+chmod +x scripts/run-all-tests.sh
+./scripts/run-all-tests.sh
+```
+
+## Deployment
+
+1. Build the project:
+   ```bash
+   npm run build
+   ```
+
+2. The build output will be in the `dist` directory, which can be deployed to any static hosting service.
+
+3. For AWS deployment, use the provided `deploy.sh` script:
+   ```bash
+   chmod +x deploy.sh
+   ./deploy.sh
+   ```
+
+## Project Structure
+
+```
+src/
+├── components/       # Reusable components
+│   ├── ui/           # UI components
+│   └── GoogleMapsAutocomplete/  # Google Maps integration
+├── lib/              # Utilities and API clients
+├── screens/          # Main application screens
+├── types/            # TypeScript type definitions
+└── App.tsx           # Main application component
+```
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `VITE_GOOGLE_MAPS_API_KEY` | Google Maps API key |
+| `VITE_COGNITO_CLIENT_ID` | AWS Cognito client ID |
+| `VITE_COGNITO_DOMAIN` | AWS Cognito domain URL |
+
+## Documentation
+
+- [Quick Start Guide](./QUICKSTART.md) - Get up and running quickly
+- [Environment Guide](./ENVIRONMENTS.md) - Managing different environments
+- [Component Docs](./src/components/GoogleMapsAutocomplete/README.md) - Using the GoogleMapsAutocomplete component
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details. 
