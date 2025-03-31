@@ -1,58 +1,84 @@
-# Dependencies
+# Node.js
+node_modules/
 /node_modules
-/.pnp
-.pnp.js
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+.npm
 
-# Build output
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+/.pytest_cache
+.coverage
+htmlcov/
+
+# Distribution / packaging
 /dist
 /build
-/out
 
 # Environment variables
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.development
+.env.test
+.env.production
 
-# Cache and logs
-.cache/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Editor directories and files
+# IDE - VSCode
 .vscode/*
-!.vscode/extensions.json
 !.vscode/settings.json
-.idea
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# IDE - JetBrains
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea_modules/
+
+# Logs
+logs
+*.log
+
+# OS specific files
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-# Testing
-/coverage
-
-# Temporary files
-*.tmp
-*.bak
+# Temp files
 *.swp
+*.swo
+*~
 
-package-lock.json
+# Database files
+*.sqlite
+*.db
 
-*.pem
-.pytest_cache
-.vscode 
-
+.vscode
 __tests__
-map-test.html
-
-/scripts
-/docs
-/examples
-/test

@@ -405,6 +405,9 @@ export const FilterSection = ({
     <div className={`flex flex-col h-full overflow-hidden ${isMinimized ? 'w-16' : 'w-[260px]'} bg-[#252136] border-r border-white/10 transition-all duration-300 ease-in-out`}>
       {/* Sidebar Header - Improved design */}
       <div className="flex items-center justify-center h-16 px-4 border-b border-white/10 bg-gradient-to-r from-[#1f1b2d] to-[#2c2640]">
+      {!isMinimized && (
+          <h3 className="ml-3 text-white font-medium flex-1 truncate">Homepage</h3>
+        )}
         <button
           onClick={toggleSidebar}
           className={`text-white/70 hover:text-white h-10 w-10 rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-105 ${
@@ -422,9 +425,7 @@ export const FilterSection = ({
           )}
         </button>
 
-        {!isMinimized && (
-          <h3 className="ml-3 text-white font-medium flex-1 truncate">Filters</h3>
-        )}
+
       </div>
       
       {/* Create New Button */}

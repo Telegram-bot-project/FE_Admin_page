@@ -9,6 +9,19 @@ A React-based admin dashboard for managing TeleBot data, featuring Google Maps i
 - 🔒 Secure authentication with AWS Cognito
 - 📊 Data management interface
 - 🌙 Dark-mode UI
+- 🎟️ Multi-tier ticket management
+- 💰 Category-specific pricing models
+- 📅 Complete event scheduling with start/end times
+- ✅ Comprehensive data validation
+
+## Recent Updates
+
+- **Category-Specific Pricing**: 
+  - Events & Entertainment: Multi-tier ticket system with unlimited price options
+  - Food & Beverage and Accommodation: Price range model for minimum/maximum pricing
+- **End Time Enhancement**: Improved time picker for both start and end times
+- **Format Validation**: Improved validation for dates, times, and required fields
+- **Category-specific Rules**: Different validation requirements based on item category
 
 ## Getting Started
 
@@ -42,6 +55,86 @@ A React-based admin dashboard for managing TeleBot data, featuring Google Maps i
    ```bash
    npm run dev
    ```
+
+## Usage Guide
+
+### Creating Items by Category
+
+#### Events & Entertainment
+- Require start date/time and end date/time
+- Support multi-tier ticket pricing:
+  - Add multiple ticket types (VIP, General Admission, etc.)
+  - Set price and currency for each ticket
+  - Include optional ticket descriptions
+
+#### Food & Beverage and Accommodation
+- Use price range model:
+  - Set minimum and maximum prices
+  - Select currency
+  - Prices display as a range (e.g., "$10-$50")
+
+#### FAQ Items
+- Question (name field) and Answer (description field) required
+- No pricing, date, or location information needed
+
+#### SOS Assistants
+- Require phone number in description field
+- Require address for location-based assistance
+- No pricing information needed
+
+### Format Requirements
+
+- **Dates**: Must use mm/dd/yyyy format (e.g., 12/31/2023)
+- **Times**: Must use hh:mm AM/PM format (e.g., 9:30 AM)
+- **Address**: Required for Event, Entertainment, Accommodation, Food & Beverage, and SOS assistants
+- **Phone Numbers**: Required for SOS assistants in the format "Phone number: +X-XXX-XXX-XXXX"
+
+## Technical Notes
+
+### Category-Specific Data Models
+
+- **Event & Entertainment**: 
+  ```json
+  {
+    "tickets": [
+      {
+        "id": "ticket-1",
+        "name": "VIP Access",
+        "price": "100",
+        "currency": "USD",
+        "description": "Front row seating"
+      },
+      {
+        "id": "ticket-2",
+        "name": "General Admission",
+        "price": "50",
+        "currency": "USD",
+        "description": ""
+      }
+    ]
+  }
+  ```
+
+- **Food & Beverage / Accommodation**:
+  ```json
+  {
+    "priceRange": {
+      "min": "10",
+      "max": "50",
+      "currency": "USD"
+    }
+  }
+  ```
+
+### Validation Rules
+
+- **Events & Entertainment**: Require end date/time and at least one ticket or "Free"
+- **Food & Beverage / Accommodation**: Require address, allow price range
+- **SOS Assistants**: Require phone number in description
+- **FAQ**: Question (name) and answer (description) are required
+- **Address**: Required for location-based categories
+- **Date Range**: End date must be after or equal to start date
+- **Time Range**: End time must be after start time on the same date
 
 ## Testing
 

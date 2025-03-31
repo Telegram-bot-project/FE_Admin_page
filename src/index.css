@@ -313,17 +313,21 @@ html {
 .overflow-tooltip:hover::after {
   content: attr(data-tooltip);
   position: absolute;
-  bottom: 100%;
+  background-color: #252136;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  white-space: normal;
+  z-index: 100;
+  font-size: 14px;
+  max-width: 400px;
+  bottom: 125%;
   left: 50%;
   transform: translateX(-50%);
-  white-space: nowrap;
-  background: rgba(0, 0, 0, 0.8);
-  color: white;
-  font-size: 0.75rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.25rem;
-  z-index: 50;
-  margin-bottom: 0.25rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  line-height: 1.4;
+  font-weight: 500;
 }
 
 /* For multiline text overflow that might be truncated */
@@ -726,4 +730,40 @@ html {
   border-radius: 50%;
   z-index: -1;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+}
+
+/* Address specific styling */
+[data-tooltip]:hover::after {
+  animation: fadeIn 0.2s ease-in-out;
+  pointer-events: none;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Enhanced cell truncation */
+.truncate-cell {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  position: relative;
+}
+
+/* Special address cell styling */
+.table-cell-optimize[data-tooltip] {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.table-cell-optimize[data-tooltip]:hover {
+  background-color: rgba(255, 255, 255, 0.05);
 }

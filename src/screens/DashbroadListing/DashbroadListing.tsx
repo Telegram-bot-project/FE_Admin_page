@@ -77,6 +77,13 @@ const PendingChangesNotification = memo(({
 
 // Modal for viewing item details
 const ItemViewModal = ({ item, onClose }: { item: KnowledgeItem, onClose: () => void }) => {
+  // Helper function to decode HTML entities
+  const decodeHtmlEntities = (html: string): string => {
+    const textArea = document.createElement('textarea');
+    textArea.innerHTML = html;
+    return textArea.value;
+  };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
     try {
@@ -115,6 +122,9 @@ const ItemViewModal = ({ item, onClose }: { item: KnowledgeItem, onClose: () => 
             {isFAQ ? "FAQ Details" : 
              isSOS ? "SOS Contact Details" :
              "Item Details"}
+            <span className="ml-3 text-sm font-normal text-white/50">
+              Last updated: {formatDate(item.updated_at)}
+            </span>
           </h2>
           <Button
             variant="ghost"
@@ -131,16 +141,16 @@ const ItemViewModal = ({ item, onClose }: { item: KnowledgeItem, onClose: () => 
         <div className="p-6">
           {/* Image section */}
           {item.image && (
-            <div className="mb-6 bg-black/30 border border-white/10 rounded-lg p-4 overflow-auto">
-              <img 
-                src={item.image || '/img/placeholder.png'} 
-                alt={item.name}
-                className="max-w-full h-auto rounded-md object-cover mb-4 max-h-[200px] w-full"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/img/placeholder.png';
-                }}
-              />
-            </div>
+          <div className="mb-6 bg-black/30 border border-white/10 rounded-lg p-4 overflow-auto">
+            <img 
+              src={item.image || '/img/placeholder.png'} 
+              alt={item.name}
+              className="max-w-full h-auto rounded-md object-cover mb-4 max-h-[200px] w-full"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/img/placeholder.png';
+              }}
+            />
+          </div>
           )}
 
           {/* Item details */}
@@ -176,39 +186,123 @@ const ItemViewModal = ({ item, onClose }: { item: KnowledgeItem, onClose: () => 
                 </div>
               </div>
               
-              {/* Timestamps */}
-              <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                <h3 className="text-white/50 text-sm font-medium mb-1">Created</h3>
-                <p className="text-white">{formatDate(item.created_at)}</p>
-              </div>
-              
-              <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                <h3 className="text-white/50 text-sm font-medium mb-1">Last Updated</h3>
-                <p className="text-white">{formatDate(item.updated_at)}</p>
-              </div>
-              
               {/* Time & Date - Only show for non-FAQ items */}
               {!isFAQ && item.date && (
-                <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+              <div className="bg-white/5 border border-white/10 rounded-lg p-4">
                   <h3 className="text-white/50 text-sm font-medium mb-1">Date</h3>
                   <p className="text-white">{item.date}</p>
-                </div>
+              </div>
               )}
               
               {!isFAQ && item.time && (
-                <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+              <div className="bg-white/5 border border-white/10 rounded-lg p-4">
                   <h3 className="text-white/50 text-sm font-medium mb-1">Time</h3>
                   <p className="text-white">{item.time}</p>
-                </div>
+              </div>
               )}
               
               {/* Price - Only show for items with price and non-FAQ */}
               {!isFAQ && item.price && (
                 <div className="bg-white/5 border border-white/10 rounded-lg p-4">
                   <h3 className="text-white/50 text-sm font-medium mb-1">Price</h3>
-                  <p className="text-white">{item.price}</p>
+                  <p className="text-white whitespace-pre-line">{
+                    (() => {
+                      // Check for tickets first
+                      if ((item as any).tickets) {
+                        try {
+                          const ticketsData = JSON.parse((item as any).tickets);
+                          if (Array.isArray(ticketsData) && ticketsData.length > 0) {
+                            // Ensure all tickets have the required properties
+                            const validTickets = ticketsData.filter(ticket => 
+                              ticket && ticket.name && ticket.price && ticket.currency
+                            );
+                            
+                            if (validTickets.length > 0) {
+                              // Format nicely - always show all tickets
+                              return validTickets.map(ticket => 
+                                `${ticket.name}: ${ticket.price} ${ticket.currency}`
+                              ).join("\n");
+                            }
+                          }
+                        } catch (e) {
+                          console.error('Error parsing tickets in modal:', e);
+                        }
+                      }
+                      
+                      // Check for our custom ticket format with parentheses
+                      if (item.price && item.price.includes('(') && item.price.includes('|')) {
+                        const lines = item.price.split('\n');
+                        const parsedTickets = lines.map(line => {
+                          // Extract ticket info from (name|price|currency) format
+                          const match = line.match(/\(([^|]+)\|([^|]+)\|([^)]+)\)/);
+                          if (match) {
+                            return {
+                              name: match[1] || '',
+                              price: match[2] || '',
+                              currency: match[3] || ''
+                            };
+                          }
+                          return null;
+                        }).filter(ticket => ticket !== null && ticket.name && ticket.price && ticket.currency);
+                        
+                        if (parsedTickets.length > 0) {
+                          // Format nicely - always show all tickets
+                          return parsedTickets.map(ticket => 
+                            `${ticket!.name}: ${ticket!.price} ${ticket!.currency}`
+                          ).join("\n");
+                        }
+                      }
+                      
+                      // Check for price range format (X-Y Currency)
+                      const priceRangeRegex = /^(\d+)-(\d+)\s+([A-Z]{3})$/;
+                      const rangeMatch = item.price.match(priceRangeRegex);
+                      
+                      if (rangeMatch) {
+                        return `${rangeMatch[1]}-${rangeMatch[2]} ${rangeMatch[3]}`;
+                      }
+                      
+                      // Return the price as is for non-range formats
+                      return item.price;
+                    })()
+                  }</p>
                 </div>
               )}
+              
+              {/* Show tickets if available */}
+              {!isFAQ && (item as any).tickets && (() => {
+                try {
+                  const ticketsData = JSON.parse((item as any).tickets);
+                  if (Array.isArray(ticketsData) && ticketsData.length > 0) {
+                    return (
+                      <div className="bg-white/5 border border-white/10 rounded-lg p-4 md:col-span-2 mt-2">
+                        <h3 className="text-white/50 text-sm font-medium mb-3">Tickets</h3>
+                        <div className="space-y-3">
+                          {ticketsData.map((ticket, index) => {
+                            if (!ticket) return null;
+                            return (
+                              <div key={index} className="bg-white/5 p-3 rounded-md flex justify-between items-center">
+                                <div>
+                                  <p className="font-medium text-white">{ticket.name || 'Unnamed Ticket'}</p>
+                                  {ticket.description && (
+                                    <p className="text-white/70 text-sm mt-1">{ticket.description}</p>
+                                  )}
+                                </div>
+                                <div className="font-semibold text-green-400">
+                                  {ticket.price || '0'} {ticket.currency || ''}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  }
+                } catch (e) {
+                  console.error('Error parsing tickets data:', e);
+                  return null;
+                }
+                return null;
+              })()}
               
               {/* Address - Show for non-FAQ or SOS items */}
               {(item.address && (!isFAQ || isSOS)) && (
@@ -556,14 +650,11 @@ export const DashbroadListing = memo(({ onItemEdit }: DashbroadListingProps): JS
         onItemEdit={onItemEdit}
         onDeleteItem={handleDeleteItem}
         onViewItem={handleViewItem}
+        lastUpdated={lastUpdated}
+        onRefresh={handleForceRefresh}
       />
     )
-  }, [error, isLoading, filteredItems, groupByCategory, onItemEdit, loadItems, handleDeleteItem, handleViewItem])
-
-  // Format last updated time
-  const formattedLastUpdated = useMemo(() => {
-    return lastUpdated.toLocaleTimeString();
-  }, [lastUpdated]);
+  }, [error, isLoading, filteredItems, groupByCategory, onItemEdit, loadItems, handleDeleteItem, handleViewItem, lastUpdated, handleForceRefresh])
 
   // Memoize hasPendingChangesValue to avoid unnecessary re-renders
   const hasPendingChangesValue = useMemo(() => hasPendingChanges(), [
@@ -578,17 +669,6 @@ export const DashbroadListing = memo(({ onItemEdit }: DashbroadListingProps): JS
       <div className="absolute top-0 left-0 right-0 bg-black/40 backdrop-blur-sm border-b border-white/10 py-3 px-6 flex justify-between items-center z-10">
         <div className="flex items-center">
           <h1 className="text-lg font-bold text-white mr-4">TeleBot Dashboard</h1>
-          <div className="text-white/50 text-xs flex items-center">
-            Last updated: {formattedLastUpdated}
-            <button 
-              onClick={handleForceRefresh}
-              className="ml-2 p-1 hover:bg-white/10 rounded-full transition-colors"
-              title="Refresh data"
-              disabled={isLoading}
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin text-white/30' : 'text-white/50'}`} />
-            </button>
-          </div>
         </div>
         
         {hasPendingChangesValue && (

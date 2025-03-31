@@ -1,5 +1,5 @@
-import { PencilIcon, TrashIcon, Eye, CheckSquare, Square, X, Trash2, ImageOff, Loader2 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import { PencilIcon, TrashIcon, Eye, CheckSquare, Square, X, Trash2, ImageOff, Loader2, RefreshCw, MapPin, Copy } from "lucide-react";
+import React, { useEffect, useState, useRef } from "react";
 import { Button } from "../../../../components/ui/button";
 import { Card, CardContent } from "../../../../components/ui/card";
 import {
@@ -28,6 +28,8 @@ interface OrderListSectionProps {
   onItemEdit: (itemId: number) => void;
   onViewItem?: (item: KnowledgeItem) => void;
   onDeleteItem?: (itemId: number) => void;
+  lastUpdated?: Date;
+  onRefresh?: () => void;
 }
 
 export const OrderListSection = ({
@@ -36,6 +38,8 @@ export const OrderListSection = ({
   onItemEdit,
   onViewItem,
   onDeleteItem,
+  lastUpdated,
+  onRefresh,
 }: OrderListSectionProps): JSX.Element => {
   const [orders, setOrders] = useState<KnowledgeItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -43,11 +47,19 @@ export const OrderListSection = ({
   const { setShowDashboard } = useContext(DashboardContext);
   
   // State for multiple selection
-  const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
+  const selectedItems = useRef<Set<number>>(new Set());
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   
   // Get functions from the Zustand store
   const { addPendingDeletion } = useDatabase();
+
+  // Helper function to decode HTML entities
+  const decodeHtmlEntities = (html: string): string => {
+    const textArea = document.createElement('textarea');
+    textArea.innerHTML = html;
+    return textArea.value;
+  };
 
   // Update orders when items change
   useEffect(() => {
@@ -79,8 +91,8 @@ export const OrderListSection = ({
       }
       
       // Reset selection whenever items change
-      setSelectedItems(new Set());
-      setIsSelectionMode(false);
+      selectedItems.current = new Set();
+      setLastSelectedIndex(null);
     } catch (err) {
       console.error("Error processing items in OrderListSection:", err);
       setOrders([]);
@@ -90,8 +102,8 @@ export const OrderListSection = ({
 
   // Handle edit
   const handleEdit = (item: KnowledgeItem) => {
-    if (isSelectionMode) {
-      handleToggleSelect(item.id);
+    if (lastSelectedIndex !== null) {
+      handleToggleSelect(lastSelectedIndex);
       return;
     }
     
@@ -130,8 +142,8 @@ export const OrderListSection = ({
 
   // Handle view
   const handleView = (item: KnowledgeItem) => {
-    if (isSelectionMode) {
-      handleToggleSelect(item.id);
+    if (lastSelectedIndex !== null) {
+      handleToggleSelect(lastSelectedIndex);
       return;
     }
     
@@ -173,54 +185,56 @@ export const OrderListSection = ({
   
   // Toggle selection mode
   const toggleSelectionMode = () => {
-    setIsSelectionMode(!isSelectionMode);
-    setSelectedItems(new Set());
+    selectedItems.current = new Set();
+    setLastSelectedIndex(null);
   };
   
   // Toggle item selection
   const handleToggleSelect = (id: number) => {
-    const newSelectedItems = new Set(selectedItems);
+    const newSelectedItems = new Set(selectedItems.current);
     if (newSelectedItems.has(id)) {
       newSelectedItems.delete(id);
     } else {
       newSelectedItems.add(id);
     }
-    setSelectedItems(newSelectedItems);
+    selectedItems.current = newSelectedItems;
+    setLastSelectedIndex(id);
   };
   
   // Select all items
   const handleSelectAll = () => {
-    if (selectedItems.size === orders.length) {
+    if (selectedItems.current.size === orders.length) {
       // If all are selected, deselect all
-      setSelectedItems(new Set());
+      selectedItems.current = new Set();
     } else {
       // Otherwise select all
       const newSelectedItems = new Set<number>();
       orders.forEach(item => newSelectedItems.add(item.id));
-      setSelectedItems(newSelectedItems);
+      selectedItems.current = newSelectedItems;
     }
+    setLastSelectedIndex(null);
   };
   
   // Handle bulk delete
   const handleBulkDelete = () => {
-    if (selectedItems.size === 0) return;
+    if (selectedItems.current.size === 0) return;
     
-    if (window.confirm(`Are you sure you want to delete ${selectedItems.size} selected item(s)?`)) {
+    if (window.confirm(`Are you sure you want to delete ${selectedItems.current.size} selected item(s)?`)) {
       try {
         // Remove from UI immediately
-        setOrders(current => current.filter(item => !selectedItems.has(item.id)));
+        setOrders(current => current.filter(item => !selectedItems.current.has(item.id)));
         
         // Add all to pending deletions
-        selectedItems.forEach(id => {
+        selectedItems.current.forEach(id => {
           addPendingDeletion(id);
         });
         
         // Reset selection
-        setSelectedItems(new Set());
-        setIsSelectionMode(false);
+        selectedItems.current = new Set();
+        setLastSelectedIndex(null);
         
         // Show notification
-        console.log(`${selectedItems.size} items marked for deletion. Click Update Database to apply changes.`);
+        console.log(`${selectedItems.current.size} items marked for deletion. Click Update Database to apply changes.`);
       } catch (error) {
         console.error("Error marking items for deletion:", error);
         alert("Failed to mark items for deletion. Please try again.");
@@ -277,6 +291,28 @@ export const OrderListSection = ({
     }
   };
 
+  // Function to copy address to clipboard
+  const copyToClipboard = (e: React.MouseEvent, text: string) => {
+    // Prevent event from propagating to row (important for selection mode)
+    e.stopPropagation();
+    
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        // You could add a toast notification here
+        console.log('Address copied to clipboard');
+        
+        // Visual feedback - flash the cell
+        const target = e.currentTarget as HTMLElement;
+        target.classList.add('bg-indigo-500/20');
+        setTimeout(() => {
+          target.classList.remove('bg-indigo-500/20');
+        }, 300);
+      })
+      .catch(err => {
+        console.error('Failed to copy address:', err);
+      });
+  };
+
   // Render orders grouped by category if requested
   const renderOrdersByCategory = () => {
     if (!groupByCategory) {
@@ -318,9 +354,9 @@ export const OrderListSection = ({
                     <button 
                       onClick={handleSelectAll}
                       className="p-1 hover:bg-white/10 rounded transition-colors"
-                      aria-label={selectedItems.size === orders.length ? "Deselect all" : "Select all"}
+                      aria-label={selectedItems.current.size === orders.length ? "Deselect all" : "Select all"}
                     >
-                      {selectedItems.size === orders.length ? (
+                      {selectedItems.current.size === orders.length ? (
                         <CheckSquare className="h-4 w-4 text-indigo-400" />
                       ) : (
                         <Square className="h-4 w-4 text-white/60" />
@@ -329,22 +365,22 @@ export const OrderListSection = ({
                   </div>
                 </TableHead>
               )}
-              <TableHead className="w-[80px] text-white/80 font-medium uppercase text-xs tracking-wider text-center">Image</TableHead>
-              <TableHead className="w-[180px] text-white/80 font-medium uppercase text-xs tracking-wider">
+              <TableHead className="w-[70px] text-white/80 font-medium uppercase text-xs tracking-wider text-center">Image</TableHead>
+              <TableHead className="w-[160px] text-white/80 font-medium uppercase text-xs tracking-wider">
                 {isFAQTable ? "Question" : isSOSTable ? "Support Type" : "Name"}
               </TableHead>
               
               {/* Date, Time, Price headers - always show in main listing, hide in FAQ group view */}
               {(showAllColumns || !isFAQTable) && (
                 <>
-                  <TableHead className="w-[100px] text-white/80 font-medium uppercase text-xs tracking-wider">Date</TableHead>
-                  <TableHead className="w-[80px] text-white/80 font-medium uppercase text-xs tracking-wider">Time</TableHead>
-                  <TableHead className="w-[80px] text-white/80 font-medium uppercase text-xs tracking-wider">Price</TableHead>
+                  <TableHead className="w-[90px] text-white/80 font-medium uppercase text-xs tracking-wider">Date</TableHead>
+                  <TableHead className="w-[70px] text-white/80 font-medium uppercase text-xs tracking-wider">Time</TableHead>
+                  <TableHead className="w-[60px] text-white/80 font-medium uppercase text-xs tracking-wider">Price</TableHead>
                 </>
               )}
               
-              {/* Always show Address header */}
-              <TableHead className="w-[180px] text-white/80 font-medium uppercase text-xs tracking-wider">Address</TableHead>
+              {/* Address header with improved width */}
+              <TableHead className="w-[300px] text-white/80 font-medium uppercase text-xs tracking-wider">Address</TableHead>
               
               <TableHead className="text-white/80 font-medium uppercase text-xs tracking-wider hidden md:table-cell">
                 {isFAQTable ? "Answer" : isSOSTable ? "Contact Information" : "Description"}
@@ -352,7 +388,7 @@ export const OrderListSection = ({
               
               {/* Type header - always show in main listing, hide in grouped views */}
               {(showAllColumns || (!isFAQTable && !isSOSTable)) && (
-                <TableHead className="w-[120px] text-white/80 font-medium uppercase text-xs tracking-wider">Type</TableHead>
+              <TableHead className="w-[120px] text-white/80 font-medium uppercase text-xs tracking-wider">Type</TableHead>
               )}
               
               <TableHead className="w-[140px] text-center text-white/80 font-medium uppercase text-xs tracking-wider">Actions</TableHead>
@@ -368,7 +404,7 @@ export const OrderListSection = ({
                 return (
                 <TableRow 
                   key={order.id} 
-                  className={`border-t border-white/5 hover:bg-white/[0.05] transition-all duration-200 group table-row-hover ${selectedItems.has(order.id) ? 'bg-indigo-900/20' : ''}`}
+                  className={`border-t border-white/5 hover:bg-white/[0.05] transition-all duration-200 group table-row-hover ${selectedItems.current.has(order.id) ? 'bg-indigo-900/20' : ''}`}
                   onClick={() => isSelectionMode ? handleToggleSelect(order.id) : null}
                 >
                   {isSelectionMode && (
@@ -377,9 +413,9 @@ export const OrderListSection = ({
                         <button 
                           onClick={(e) => { e.stopPropagation(); handleToggleSelect(order.id); }}
                           className="p-1 hover:bg-white/10 rounded transition-colors"
-                          aria-label={selectedItems.has(order.id) ? "Deselect" : "Select"}
+                          aria-label={selectedItems.current.has(order.id) ? "Deselect" : "Select"}
                         >
-                          {selectedItems.has(order.id) ? (
+                          {selectedItems.current.has(order.id) ? (
                             <CheckSquare className="h-4 w-4 text-indigo-400" />
                           ) : (
                             <Square className="h-4 w-4 text-white/60" />
@@ -433,29 +469,158 @@ export const OrderListSection = ({
                   {/* Date/Time/Price cells - conditionally show based on type and view mode */}
                   {(showAllColumns || order.type !== "FAQ") ? (
                     <>
-                      <TableCell className="text-white/80">
-                        {formatDate(order.date)}
-                      </TableCell>
-                      <TableCell className="text-white/80">
-                        {order.time || "N/A"}
-                      </TableCell>
-                      <TableCell className="text-white/80">
-                        {order.price ? (
-                          <span className="font-medium text-green-400">{order.price}</span>
-                        ) : (
-                          <span className="text-white/50">Free</span>
-                        )}
-                      </TableCell>
+                  <TableCell className="text-white/80">
+                    {formatDate(order.date)}
+                  </TableCell>
+                  <TableCell className="text-white/80">
+                    {order.time || "N/A"}
+                  </TableCell>
+                  <TableCell className="text-white/80">
+                    {order.price ? (
+                          <span className="font-medium text-green-400 relative group cursor-help">
+                            {(() => {
+                              // Check if item has tickets data
+                              if ((order as any).tickets) {
+                                try {
+                                  const tickets = JSON.parse((order as any).tickets);
+                                  if (Array.isArray(tickets) && tickets.length > 0) {
+                                    // Add tooltip for ticket details
+                                    const ticketDetails = tickets.map(ticket => 
+                                      `${ticket.name}: ${ticket.price} ${ticket.currency}`
+                                    ).join('\n');
+                                    
+                                    return (
+                                      <>
+                                        {tickets.length === 1 && tickets[0] ? (
+                                          // Single ticket - display simply
+                                          <span>
+                                            {`${tickets[0].price} ${tickets[0].currency}`}
+                                          </span>
+                                        ) : (
+                                          // Multiple tickets - format nicely
+                                          <div className="whitespace-pre-line text-xs">
+                                            {tickets.map(ticket => 
+                                              `${ticket.name}: ${ticket.price} ${ticket.currency}`
+                                            ).join('\n')}
+                                          </div>
+                                        )}
+                                        {/* Tooltip */}
+                                      </>
+                                    );
+                                  }
+                                } catch (e) {
+                                  // If parsing fails, show the raw price
+                                  console.error('Error parsing tickets:', e);
+                                }
+                              }
+                              
+                              // Check for our custom ticket format with parentheses
+                              if (order.price && order.price.includes('(') && order.price.includes('|')) {
+                                const lines = order.price.split('\n');
+                                const parsedTickets = lines.map(line => {
+                                  // Extract ticket info from (name|price|currency) format
+                                  const match = line.match(/\(([^|]+)\|([^|]+)\|([^)]+)\)/);
+                                  if (match) {
+                                    return {
+                                      name: match[1],
+                                      price: match[2],
+                                      currency: match[3]
+                                    };
+                                  }
+                                  return null;
+                                }).filter((ticket): ticket is {name: string; price: string; currency: string} => ticket !== null);
+                                
+                                if (parsedTickets.length > 0) {
+                                  // Format for display
+                                  const ticketDetails = parsedTickets.map(ticket => 
+                                    `${ticket.name}: ${ticket.price} ${ticket.currency}`
+                                  ).join('\n');
+                                  
+                                  return (
+                                    <>
+                                      {parsedTickets.length === 1 ? (
+                                        // Single ticket - display simply
+                                        <span>
+                                          {`${parsedTickets[0].price} ${parsedTickets[0].currency}`}
+                                        </span>
+                                      ) : (
+                                        // Multiple tickets - format nicely
+                                        <div className="whitespace-pre-line text-xs">
+                                          {parsedTickets.map(ticket => 
+                                            `${ticket.name}: ${ticket.price} ${ticket.currency}`
+                                          ).join('\n')}
+                                        </div>
+                                      )}
+                                      {/* Tooltip */}
+                                    </>
+                                  );
+                                }
+                              }
+                              
+                              // Check if it's a price range (format: "X-Y Currency" or "From X Currency" or "Up to Y Currency")
+                              const priceRangeRegex = /^(\d+)-(\d+)\s+([A-Z]{3})$/;
+                              const fromPriceRegex = /^From\s+(\d+)\s+([A-Z]{3})$/;
+                              const upToPriceRegex = /^Up to\s+(\d+)\s+([A-Z]{3})$/;
+                              
+                              const rangeMatch = order.price.match(priceRangeRegex);
+                              const fromMatch = order.price.match(fromPriceRegex);
+                              const upToMatch = order.price.match(upToPriceRegex);
+                              
+                              if (rangeMatch) {
+                                return (
+                                  <>
+                                    {`${rangeMatch[1]}-${rangeMatch[2]} ${rangeMatch[3]}`}
+                                    <div className="absolute hidden group-hover:block z-10 w-60 bg-gray-900 text-white text-xs rounded p-2 shadow-lg -top-2 left-full ml-2">
+                                      <div className="font-semibold mb-1">Price Range:</div>
+                                      Min: {rangeMatch[1]} {rangeMatch[3]}<br />
+                                      Max: {rangeMatch[2]} {rangeMatch[3]}
+                                    </div>
+                                  </>
+                                );
+                              } else if (fromMatch) {
+                                return `From ${fromMatch[1]} ${fromMatch[2]}`;
+                              } else if (upToMatch) {
+                                return `Up to ${upToMatch[1]} ${upToMatch[2]}`;
+                              }
+                              
+                              // If the price contains newlines, render with whitespace preserved
+                              if (order.price.includes('\n')) {
+                                return (
+                                  <div className="whitespace-pre-line text-xs">
+                                    {decodeHtmlEntities(order.price)}
+                                  </div>
+                                );
+                              }
+                              
+                              // Default: return the price as is, but decode HTML entities if present
+                              return decodeHtmlEntities(order.price);
+                            })()}
+                          </span>
+                    ) : (
+                      <span className="text-white/50">Free</span>
+                    )}
+                  </TableCell>
                     </>
                   ) : (
                     // Hidden spanning cell for FAQ items when in grouped view
                     <TableCell colSpan={3} className="hidden"></TableCell>
                   )}
                   
-                  {/* Address cell - always show (may be empty for FAQ) */}
-                  <TableCell className="text-white/80 table-cell-optimize" data-tooltip={order.address || "N/A"}>
-                    <div className="truncate-cell overflow-tooltip">
-                      {order.address || "N/A"}
+                  {/* Address cell - always show with responsive styling */}
+                  <TableCell 
+                    className="text-white/80 table-cell-optimize transition-colors duration-200" 
+                    data-tooltip={order.address ? `${order.address} (Click to copy)` : "N/A"}
+                    onClick={(e) => order.address ? copyToClipboard(e, order.address) : null}
+                  >
+                    <div className="truncate-cell overflow-tooltip max-w-[280px] group flex items-center">
+                      {order.address ? (
+                        <>
+                          <span className="text-indigo-200 font-medium inline-block px-2 py-1 rounded bg-white/5 hover:bg-indigo-500/10 hover:text-indigo-100 transition-colors whitespace-nowrap overflow-ellipsis overflow-hidden cursor-pointer">{order.address}</span>
+                          <Copy className="h-3.5 w-3.5 ml-1 text-white/30 group-hover:text-indigo-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </>
+                      ) : (
+                        <span className="text-white/50 italic px-2 py-1">N/A</span>
+                      )}
                     </div>
                   </TableCell>
                   
@@ -466,21 +631,21 @@ export const OrderListSection = ({
                         {phoneNumber}
                       </div>
                     ) : (
-                      <div className="line-clamp-2 multiline-truncate" data-tooltip={order.description || 'No description'}>
-                        {order.description || 'No description'}
-                      </div>
+                    <div className="line-clamp-2 multiline-truncate" data-tooltip={order.description || 'No description'}>
+                      {order.description || 'No description'}
+                    </div>
                     )}
                   </TableCell>
                   
                   {/* Type cell - conditionally show based on type and view mode */}
                   {(showAllColumns || (order.type !== "FAQ" && order.type !== "SOS assistants")) ? (
-                    <TableCell>
-                      <span 
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium inline-flex items-center justify-center ${getTypeStyle(order.type || "Custom").bg} ${getTypeStyle(order.type || "Custom").text} border ${getTypeStyle(order.type || "Custom").border} transition-transform group-hover:scale-105`}
-                      >
-                        {order.type || "Custom"}
-                      </span>
-                    </TableCell>
+                  <TableCell>
+                    <span 
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium inline-flex items-center justify-center ${getTypeStyle(order.type || "Custom").bg} ${getTypeStyle(order.type || "Custom").text} border ${getTypeStyle(order.type || "Custom").border} transition-transform group-hover:scale-105`}
+                    >
+                      {order.type || "Custom"}
+                    </span>
+                  </TableCell>
                   ) : (
                     // Hidden cell for FAQ/SOS items when in grouped view
                     <TableCell className="hidden"></TableCell>
@@ -583,14 +748,29 @@ export const OrderListSection = ({
     <div className="space-y-4">
       {/* Header with item count and selection actions */}
       <div className="flex justify-between items-center mb-4">
+          {lastUpdated && (
+            <div className="text-white/50 text-xs flex items-center ml-3">
+              <span className="">Last updated: {lastUpdated.toLocaleTimeString()}</span>
+              {onRefresh && (
+                <button 
+                  onClick={onRefresh}
+                  className="ml-2 p-1 hover:bg-white/10 rounded-full transition-colors"
+                  title="Refresh data"
+                >
+                  <RefreshCw className="h-3.5 w-3.5 text-white/50" />
+                </button>
+              )}
+            </div>
+          )}
         <div className="text-sm text-white/60">
           {orders.length} {orders.length === 1 ? 'item' : 'items'} found
-          {isSelectionMode && selectedItems.size > 0 && (
+          </div>
+          {isSelectionMode && selectedItems.current.size > 0 && (
             <span className="ml-2 text-indigo-300">
-              ({selectedItems.size} selected)
+              ({selectedItems.current.size} selected)
             </span>
           )}
-        </div>
+
         
         {/* Selection mode controls */}
         <div className="flex items-center gap-2">
@@ -610,11 +790,11 @@ export const OrderListSection = ({
                 variant="destructive"
                 size="sm"
                 onClick={handleBulkDelete}
-                disabled={selectedItems.size === 0}
-                className={`bg-red-600/20 text-red-300 hover:bg-red-500/30 hover:text-red-200 border-red-500/20 transition-all duration-200 shadow-sm hover:shadow-red-900/20 action-button ${selectedItems.size === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={selectedItems.current.size === 0}
+                className={`bg-red-600/20 text-red-300 hover:bg-red-500/30 hover:text-red-200 border-red-500/20 transition-all duration-200 shadow-sm hover:shadow-red-900/20 action-button ${selectedItems.current.size === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <Trash2 className="h-3.5 w-3.5 mr-1" />
-                Delete Selected ({selectedItems.size})
+                Delete Selected ({selectedItems.current.size})
               </Button>
             </>
           ) : (

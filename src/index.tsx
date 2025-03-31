@@ -1,6 +1,15 @@
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
-import { App } from "./App";
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { App } from './App';
+import './index.css';
+import { debugEnv } from './lib/envUtils';
+
+// Debug environment variables at startup
+console.log('Application starting...');
+debugEnv();
+
+// Import auth provider
 import { AuthProvider } from "react-oidc-context";
 import { WebStorageStateStore } from "oidc-client-ts";
 
@@ -87,18 +96,23 @@ if (!rootElement) {
 }
 
 try {
-  createRoot(rootElement as HTMLElement).render(
-  <StrictMode>
+  ReactDOM.createRoot(rootElement as HTMLElement).render(
+    <React.StrictMode>
       <AuthProvider {...cognitoAuthConfig}>
-    <App />
+        <Router>
+          <Routes>
+            <Route path="/" element={<App />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Router>
       </AuthProvider>
-  </StrictMode>,
-);
+    </React.StrictMode>,
+  );
 } catch (error) {
   console.error('Error initializing application:', error);
   
   // Render a basic error page if initialization fails
-  createRoot(rootElement as HTMLElement).render(
+  ReactDOM.createRoot(rootElement as HTMLElement).render(
     <div className="min-h-screen bg-gradient-to-br from-[#2b2641] to-[#1a1625] flex items-center justify-center p-4">
       <div className="bg-red-900/50 p-6 rounded-lg border border-red-500/50 text-center max-w-md">
         <h2 className="text-xl font-bold text-white mb-4">Application Error</h2>

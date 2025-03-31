@@ -365,21 +365,31 @@ export const getAllItems = async (user?: User, bypassCache = false): Promise<Adm
     console.log('Successfully fetched items:', data.length);
     
     // Transform the data to ensure all required fields exist and properly set category
-    const processedData = data.map((item: any) => ({
-      ...item,
-      // Ensure essential fields exist and sanitize user input
-      id: item.id,
-      name: SecurityUtils.sanitizeInput(item.name || ""),
-      address: SecurityUtils.sanitizeInput(item.address || ""),
-      description: SecurityUtils.sanitizeInput(item.description || ""),
-      price: SecurityUtils.sanitizeInput(item.price || ""),
-      time: SecurityUtils.sanitizeInput(item.time || ""),
-      date: SecurityUtils.sanitizeInput(item.date || ""),
-      // Ensure category field is properly set (some items might use type instead) and convert legacy names
-      category: mapCategory(item.category || item.type || "Custom"), 
-      type: item.type || item.category || "Custom", // Ensure type is also set for backwards compatibility
-      image: item.image || null
-    }));
+    const processedData = data.map((item: any) => {
+      // Log address for debugging
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Item ${item.id} address (original): "${item.address}"`);
+      }
+      
+      // Process and normalize the address
+      const cleanAddress = typeof item.address === 'string' ? item.address.trim() : '';
+      
+      return {
+        ...item,
+        // Ensure essential fields exist and sanitize user input
+        id: item.id,
+        name: SecurityUtils.sanitizeInput(item.name || ""),
+        address: SecurityUtils.sanitizeInput(cleanAddress),
+        description: SecurityUtils.sanitizeInput(item.description || ""),
+        price: SecurityUtils.sanitizeInput(item.price || ""),
+        time: SecurityUtils.sanitizeInput(item.time || ""),
+        date: SecurityUtils.sanitizeInput(item.date || ""),
+        // Ensure category field is properly set (some items might use type instead) and convert legacy names
+        category: mapCategory(item.category || item.type || "Custom"), 
+        type: item.type || item.category || "Custom", // Ensure type is also set for backwards compatibility
+        image: item.image || null
+      };
+    });
     
     // Cache the processed items
     cache.set('allItems', processedData, cache.items);
@@ -419,7 +429,7 @@ export const createItem = async (item: AdminInputKnowledgeItem, user?: User): Pr
     const sanitizedItem = {
       ...item,
       name: SecurityUtils.sanitizeInput(item.name),
-      address: SecurityUtils.sanitizeInput(item.address),
+      address: SecurityUtils.sanitizeInput(typeof item.address === 'string' ? item.address.trim() : ''),
       description: SecurityUtils.sanitizeInput(item.description),
       price: SecurityUtils.sanitizeInput(item.price),
       time: SecurityUtils.sanitizeInput(item.time),
@@ -516,7 +526,7 @@ export const updateItem = async (id: number, item: AdminInputKnowledgeItem, user
     const sanitizedItem = {
       ...item,
       name: SecurityUtils.sanitizeInput(item.name),
-      address: SecurityUtils.sanitizeInput(item.address),
+      address: SecurityUtils.sanitizeInput(typeof item.address === 'string' ? item.address.trim() : ''),
       description: SecurityUtils.sanitizeInput(item.description),
       price: SecurityUtils.sanitizeInput(item.price),
       time: SecurityUtils.sanitizeInput(item.time),
