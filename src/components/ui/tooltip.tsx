@@ -1,7 +1,7 @@
 import React, { useState, ReactNode } from 'react';
 
 interface TooltipProps {
-  content: string;
+  content: React.ReactNode;
   children: ReactNode;
   position?: 'top' | 'bottom' | 'left' | 'right';
   delay?: number;

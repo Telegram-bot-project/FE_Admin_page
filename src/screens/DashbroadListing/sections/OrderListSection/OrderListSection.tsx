@@ -477,125 +477,132 @@ export const OrderListSection = ({
                   </TableCell>
                   <TableCell className="text-white/80">
                     {order.price ? (
-                          <span className="font-medium text-green-400 relative group cursor-help">
-                            {(() => {
-                              // Check if item has tickets data
-                              if ((order as any).tickets) {
-                                try {
-                                  const tickets = JSON.parse((order as any).tickets);
-                                  if (Array.isArray(tickets) && tickets.length > 0) {
-                                    // Add tooltip for ticket details
-                                    const ticketDetails = tickets.map(ticket => 
-                                      `${ticket.name}: ${ticket.price} ${ticket.currency}`
-                                    ).join('\n');
-                                    
-                                    return (
-                                      <>
-                                        {tickets.length === 1 && tickets[0] ? (
-                                          // Single ticket - display simply
-                                          <span>
-                                            {`${tickets[0].price} ${tickets[0].currency}`}
-                                          </span>
-                                        ) : (
-                                          // Multiple tickets - format nicely
-                                          <div className="whitespace-pre-line text-xs">
-                                            {tickets.map(ticket => 
-                                              `${ticket.name}: ${ticket.price} ${ticket.currency}`
-                                            ).join('\n')}
-                                          </div>
-                                        )}
-                                        {/* Tooltip */}
-                                      </>
-                                    );
-                                  }
-                                } catch (e) {
-                                  // If parsing fails, show the raw price
-                                  console.error('Error parsing tickets:', e);
+                      <div className="relative">
+                        <Tooltip 
+                          content={
+                            (() => {
+                              // Handle price range format (used mainly for accommodation)
+                              if (order.price.includes('-') && order.price.match(/\d+-\d+\s+[A-Z]{3}/)) {
+                                const match = order.price.match(/(\d+)-(\d+)\s+([A-Z]{3})/);
+                                if (match) {
+                                  return (
+                                    <div className="p-1">
+                                      <div className="font-semibold mb-1">Price Range:</div>
+                                      <div>Min: {match[1]} {match[3]}</div>
+                                      <div>Max: {match[2]} {match[3]}</div>
+                                    </div>
+                                  );
                                 }
                               }
                               
-                              // Check for our custom ticket format with parentheses
+                              // Handle custom ticket format with parentheses (used for events and entertainment)
                               if (order.price && order.price.includes('(') && order.price.includes('|')) {
                                 const lines = order.price.split('\n');
                                 const parsedTickets = lines.map(line => {
-                                  // Extract ticket info from (name|price|currency) format
                                   const match = line.match(/\(([^|]+)\|([^|]+)\|([^)]+)\)/);
                                   if (match) {
                                     return {
-                                      name: match[1],
-                                      price: match[2],
-                                      currency: match[3]
+                                      name: match[1].trim(),
+                                      price: match[2].trim(),
+                                      currency: match[3].trim()
                                     };
                                   }
                                   return null;
                                 }).filter((ticket): ticket is {name: string; price: string; currency: string} => ticket !== null);
                                 
                                 if (parsedTickets.length > 0) {
-                                  // Format for display
-                                  const ticketDetails = parsedTickets.map(ticket => 
-                                    `${ticket.name}: ${ticket.price} ${ticket.currency}`
-                                  ).join('\n');
-                                  
                                   return (
-                                    <>
-                                      {parsedTickets.length === 1 ? (
-                                        // Single ticket - display simply
-                                        <span>
-                                          {`${parsedTickets[0].price} ${parsedTickets[0].currency}`}
-                                        </span>
-                                      ) : (
-                                        // Multiple tickets - format nicely
-                                        <div className="whitespace-pre-line text-xs">
-                                          {parsedTickets.map(ticket => 
-                                            `${ticket.name}: ${ticket.price} ${ticket.currency}`
-                                          ).join('\n')}
-                                        </div>
-                                      )}
-                                      {/* Tooltip */}
-                                    </>
+                                    <div className="p-1">
+                                      <div className="font-semibold mb-1">Ticket Prices:</div>
+                                      {parsedTickets.map((ticket, idx) => (
+                                        <div key={idx}>{ticket.name}: {ticket.price} {ticket.currency}</div>
+                                      ))}
+                                    </div>
                                   );
                                 }
                               }
                               
-                              // Check if it's a price range (format: "X-Y Currency" or "From X Currency" or "Up to Y Currency")
+                              // Handle JSON ticket data
+                              try {
+                                if ((order as any).tickets) {
+                                  const tickets = JSON.parse((order as any).tickets);
+                                  if (Array.isArray(tickets) && tickets.length > 0) {
+                                    return (
+                                      <div className="p-1">
+                                        <div className="font-semibold mb-1">Ticket Prices:</div>
+                                        {tickets.map((ticket, idx) => (
+                                          <div key={idx}>{ticket.name}: {ticket.price} {ticket.currency}</div>
+                                        ))}
+                                      </div>
+                                    );
+                                  }
+                                }
+                              } catch (e) {
+                                console.error('Error parsing tickets:', e);
+                              }
+                              
+                              // Default
+                              return <div className="p-1">{decodeHtmlEntities(order.price)}</div>;
+                            })() as React.ReactNode
+                          }
+                        >
+                          <span className="font-medium text-green-400 cursor-help">
+                            {(() => {
+                              // Check for our custom ticket format with parentheses
+                              if (order.price && order.price.includes('(') && order.price.includes('|')) {
+                                const lines = order.price.split('\n');
+                                const parsedTickets = lines.map(line => {
+                                  const match = line.match(/\(([^|]+)\|([^|]+)\|([^)]+)\)/);
+                                  if (match) {
+                                    return {
+                                      name: match[1].trim(),
+                                      price: match[2].trim(),
+                                      currency: match[3].trim()
+                                    };
+                                  }
+                                  return null;
+                                }).filter((ticket): ticket is {name: string; price: string; currency: string} => ticket !== null);
+                                
+                                if (parsedTickets.length > 0) {
+                                  if (parsedTickets.length === 1) {
+                                    // Single ticket - display simply
+                                    return `${parsedTickets[0].price} ${parsedTickets[0].currency}`;
+                                  } else {
+                                    // Multiple tickets - indicate multiple
+                                    return `${parsedTickets[0].price}+ ${parsedTickets[0].currency}`;
+                                  }
+                                }
+                              }
+                              
+                              // JSON tickets data
+                              try {
+                                if ((order as any).tickets) {
+                                  const tickets = JSON.parse((order as any).tickets);
+                                  if (Array.isArray(tickets) && tickets.length > 0) {
+                                    if (tickets.length === 1 && tickets[0]?.price && tickets[0]?.currency) {
+                                      return `${tickets[0].price} ${tickets[0].currency}`;
+                                    } else if (tickets.length > 1 && tickets[0]?.price && tickets[0]?.currency) {
+                                      return `${tickets[0].price}+ ${tickets[0].currency}`;
+                                    }
+                                  }
+                                }
+                              } catch (e) {
+                                // Fallback to raw price
+                              }
+                              
+                              // Price range format
                               const priceRangeRegex = /^(\d+)-(\d+)\s+([A-Z]{3})$/;
-                              const fromPriceRegex = /^From\s+(\d+)\s+([A-Z]{3})$/;
-                              const upToPriceRegex = /^Up to\s+(\d+)\s+([A-Z]{3})$/;
-                              
                               const rangeMatch = order.price.match(priceRangeRegex);
-                              const fromMatch = order.price.match(fromPriceRegex);
-                              const upToMatch = order.price.match(upToPriceRegex);
-                              
                               if (rangeMatch) {
-                                return (
-                                  <>
-                                    {`${rangeMatch[1]}-${rangeMatch[2]} ${rangeMatch[3]}`}
-                                    <div className="absolute hidden group-hover:block z-10 w-60 bg-gray-900 text-white text-xs rounded p-2 shadow-lg -top-2 left-full ml-2">
-                                      <div className="font-semibold mb-1">Price Range:</div>
-                                      Min: {rangeMatch[1]} {rangeMatch[3]}<br />
-                                      Max: {rangeMatch[2]} {rangeMatch[3]}
-                                    </div>
-                                  </>
-                                );
-                              } else if (fromMatch) {
-                                return `From ${fromMatch[1]} ${fromMatch[2]}`;
-                              } else if (upToMatch) {
-                                return `Up to ${upToMatch[1]} ${upToMatch[2]}`;
+                                return `${rangeMatch[1]}-${rangeMatch[2]} ${rangeMatch[3]}`;
                               }
                               
-                              // If the price contains newlines, render with whitespace preserved
-                              if (order.price.includes('\n')) {
-                                return (
-                                  <div className="whitespace-pre-line text-xs">
-                                    {decodeHtmlEntities(order.price)}
-                                  </div>
-                                );
-                              }
-                              
-                              // Default: return the price as is, but decode HTML entities if present
+                              // Default display
                               return decodeHtmlEntities(order.price);
                             })()}
                           </span>
+                        </Tooltip>
+                      </div>
                     ) : (
                       <span className="text-white/50">Free</span>
                     )}
@@ -609,13 +616,24 @@ export const OrderListSection = ({
                   {/* Address cell - always show with responsive styling */}
                   <TableCell 
                     className="text-white/80 table-cell-optimize transition-colors duration-200" 
-                    data-tooltip={order.address ? `${order.address} (Click to copy)` : "N/A"}
                     onClick={(e) => order.address ? copyToClipboard(e, order.address) : null}
                   >
-                    <div className="truncate-cell overflow-tooltip max-w-[280px] group flex items-center">
+                    <div className="truncate-cell max-w-[280px] group flex items-center">
                       {order.address ? (
                         <>
-                          <span className="text-indigo-200 font-medium inline-block px-2 py-1 rounded bg-white/5 hover:bg-indigo-500/10 hover:text-indigo-100 transition-colors whitespace-nowrap overflow-ellipsis overflow-hidden cursor-pointer">{order.address}</span>
+                          <Tooltip 
+                            content={
+                              <div className="p-1">
+                                <div className="font-medium mb-1">Address:</div>
+                                <div>{order.address}</div>
+                                <div className="text-xs text-white/70 mt-1">(Click to copy)</div>
+                              </div>
+                            }
+                          >
+                            <span className="text-indigo-200 font-medium inline-block px-2 py-1 rounded bg-white/5 hover:bg-indigo-500/10 hover:text-indigo-100 transition-colors whitespace-nowrap overflow-ellipsis overflow-hidden cursor-pointer">
+                              {order.address}
+                            </span>
+                          </Tooltip>
                           <Copy className="h-3.5 w-3.5 ml-1 text-white/30 group-hover:text-indigo-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </>
                       ) : (
